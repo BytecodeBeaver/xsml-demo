@@ -7,5 +7,5 @@
     "noEmit": true,
     "skipLibCheck": true
   },
-  "include": ["game.ts", "assets.d.ts"]
+  "include": ["game.ts", "assets.d.ts", "vite.config.ts"]
 }

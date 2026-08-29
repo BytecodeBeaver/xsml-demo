@@ -6,8 +6,17 @@
       <title>Game Terminal</title>
     </head>
     <body>
-      <h1>Game is working!</h1>
-      <div id="terminal"></div>
+      <main id="app">
+        <section id="scenario-screen">
+          <h1>Wybierz scenariusz</h1>
+          <p id="scenario-status"></p>
+          <ul id="scenario-list"></ul>
+        </section>
+        <section id="game-screen" hidden>
+          <button id="back-to-scenarios" type="button">&larr; Wybor scenariusza</button>
+          <div id="terminal"></div>
+        </section>
+      </main>
       <script type="module" src="/game.ts"></script>
     </body>
   </html>

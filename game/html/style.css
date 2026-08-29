@@ -1,0 +1,56 @@
+body {
+  margin: 0;
+  font-family: system-ui, sans-serif;
+  background: #1e1e1e;
+  color: #e0e0e0;
+}
+
+#app {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+#scenario-list {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.scenario-option {
+  width: 100%;
+  text-align: left;
+  background: #2a2a2a;
+  color: inherit;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.scenario-option:hover {
+  border-color: #7aa2f7;
+}
+
+.scenario-option span {
+  color: #aaa;
+  font-size: 0.9rem;
+}
+
+#back-to-scenarios {
+  margin-bottom: 1rem;
+  background: #2a2a2a;
+  color: inherit;
+  border: 1px solid #444;
+  border-radius: 6px;
+  padding: 0.4rem 0.8rem;
+  cursor: pointer;
+}
+
+#terminal {
+  height: 500px;
+}
