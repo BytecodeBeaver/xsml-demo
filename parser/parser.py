@@ -8,8 +8,26 @@ class SimulationScenario:
         self.goals: dict = scenario_data.get("goals")
         self.actions: dict = scenario_data.get("actions")
 
+        # Observer
+        self._listeners = []
+
+    def add_listener(self, listener):
+        self._listeners.append(listener)
+
+    def _notify_listeners(self, scope: str, variable_name: str, value):
+        for listener in self._listeners:
+            listener(scope, variable_name, value)
+
+    def set_inventory_variable(self, variable_name: str, value):
+        self.inventory[variable_name] = value
+        self._notify_listeners("inventory", variable_name, value)
+
     def get_inventory_variable(self, variable_name: str):
         return self.inventory.get(variable_name)
+
+    def set_environment_variable(self, variable_name: str, value):
+        self.environment[variable_name] = value
+        self._notify_listeners("environment", variable_name, value)
 
     def get_environment_variable(self, variable_name: str):
         return self.environment.get(variable_name)
