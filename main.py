@@ -32,10 +32,11 @@ def load_scenario(path: str) -> SimulationScenario:
     return XSMLParser.parse(yaml_data)
 
 
-def serialize_goal(goal: SimulationGoal) -> dict:
+def serialize_goal(goal: SimulationGoal, is_top_level: bool = False) -> dict:
     return {
         "id": goal.id,
-        "description": goal.description,
+        # The top-level goal's content is always known; deeper goals stay hidden until achieved.
+        "description": goal.description if (is_top_level or goal.achieved) else None,
         "achieved": goal.achieved,
         "subgoals": [serialize_goal(subgoal) for subgoal in goal.subgoals.values()],
     }
@@ -43,7 +44,7 @@ def serialize_goal(goal: SimulationGoal) -> dict:
 
 def serialize_state(game_logic: GameLogic) -> dict:
     return {
-        "goals": [serialize_goal(goal) for goal in game_logic.goals.values()],
+        "goals": [serialize_goal(goal, is_top_level=True) for goal in game_logic.goals.values()],
         "actions": [
             {"id": action_id, "description": action.description, "available": action.available}
             for action_id, action in game_logic.actions.items()
@@ -114,16 +115,11 @@ def create_app() -> Tuple[Flask, SocketIO]:
             return
 
         action_id = (data or {}).get('action_id')
-        action = game_logic.actions.get(action_id)
-        if action is None:
-            emit('error', {"message": f"Nieznana akcja: {action_id}"})
+        try:
+            action = game_logic.execute_action(action_id)
+        except ValueError as error:
+            emit('error', {"message": str(error)})
             return
-        if not action.available:
-            emit('error', {"message": f"Akcja '{action_id}' jest obecnie niedostepna."})
-            return
-
-        for variable_name, value in (action.effects or {}).items():
-            game_logic.scenario.set_inventory_variable(variable_name, value)
 
         emit('terminal_output', {
             "command": action.command,

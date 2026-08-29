@@ -12,7 +12,7 @@ interface Scenario {
 
 interface Goal {
   id: string;
-  description: string;
+  description: string | null;
   achieved: boolean;
   subgoals: Goal[];
 }
@@ -249,7 +249,7 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
 function renderState(state: GameState): void {
   goalsList.innerHTML = '';
   for (const goal of state.goals) {
-    goalsList.appendChild(buildTopGoalNode(goal));
+    goalsList.appendChild(buildGoalNode(goal));
   }
 
   actionsList.innerHTML = '';
@@ -260,37 +260,24 @@ function renderState(state: GameState): void {
   terminal?.write(`\r\n${TERMINAL_PROMPT}`);
 }
 
-// Top-level goals are always shown; their unfinished subgoals are nested underneath.
-function buildTopGoalNode(goal: Goal): HTMLLIElement {
+// The full goal hierarchy is always visible; only a goal's own description stays hidden until achieved.
+function buildGoalNode(goal: Goal): HTMLLIElement {
   const item = buildGoalItem(goal);
-  const subgoalsPending = goal.subgoals.length > 0 && !goal.subgoals.every((subgoal) => subgoal.achieved);
-  if (subgoalsPending) {
+  if (goal.subgoals.length > 0) {
     const sublist = document.createElement('ul');
     sublist.className = 'goal-subgoals';
     for (const subgoal of goal.subgoals) {
-      for (const node of buildGoalNodes(subgoal)) {
-        sublist.appendChild(node);
-      }
+      sublist.appendChild(buildGoalNode(subgoal));
     }
     item.appendChild(sublist);
   }
   return item;
 }
 
-// A goal stays hidden (its subgoals surface in its place) until all its subgoals are achieved.
-function buildGoalNodes(goal: Goal): HTMLLIElement[] {
-  const unlocked = goal.subgoals.length === 0 || goal.subgoals.every((subgoal) => subgoal.achieved);
-  if (!unlocked) {
-    return goal.subgoals.flatMap((subgoal) => buildGoalNodes(subgoal));
-  }
-
-  return [buildGoalItem(goal)];
-}
-
 function buildGoalItem(goal: Goal): HTMLLIElement {
   const item = document.createElement('li');
   const label = document.createElement('label');
-  label.className = `goal-item${goal.achieved ? ' achieved' : ''}`;
+  label.className = `goal-item${goal.achieved ? ' achieved' : ' locked'}`;
 
   const checkbox = document.createElement('input');
   checkbox.type = 'checkbox';
@@ -298,7 +285,8 @@ function buildGoalItem(goal: Goal): HTMLLIElement {
   checkbox.disabled = true;
 
   const text = document.createElement('span');
-  text.textContent = goal.description || goal.id;
+  // The server only sends a description once the goal's content may be revealed.
+  text.textContent = goal.description ?? '??? (cel ukryty)';
 
   label.appendChild(checkbox);
   label.appendChild(text);

@@ -2,13 +2,49 @@ from parser.parser import SimulationScenario
 from typing import Dict
 
 class SimulationAction:
-    def __init__(self, id, description, command, simulated_output, requires, effects, available=False):
+    def __init__(self, id, description, command, simulated_output, requires, inventory_changes, environment_changes, available=False):
         self.description: str = description
         self.command: str = command
         self.simulated_output: str = simulated_output
         self.requires: dict = requires
-        self.effects: dict = effects
+        self.inventory_changes: dict = inventory_changes
+        self.environment_changes: dict = environment_changes
         self.available: bool = available
+
+    @staticmethod
+    def _iter_produced_entries(action_data: dict):
+        for produced in action_data.get("produces") or []:
+            if not isinstance(produced, dict):
+                continue
+            # Produced entries can be flat (id/probability/inventory_change/...) or wrapped
+            # in a single key naming the produced fact, e.g. {"fact_name": {inventory_change: ...}}.
+            if "inventory_change" in produced or "environment_change" in produced or "simulated_output" in produced:
+                yield produced
+            else:
+                for value in produced.values():
+                    if isinstance(value, dict):
+                        yield value
+
+    @staticmethod
+    def _merge_change_map(data) -> dict:
+        if not data:
+            return {}
+        if isinstance(data, dict):
+            return dict(data)
+        if isinstance(data, list):
+            merged = {}
+            for entry in data:
+                if isinstance(entry, dict):
+                    merged.update(entry)
+            return merged
+        raise ValueError("inventory_change/environment_change musi byc slownikiem lub lista.")
+
+    @classmethod
+    def _collect_changes(cls, action_data: dict, key: str) -> dict:
+        changes: dict = {}
+        for entry in cls._iter_produced_entries(action_data):
+            changes.update(cls._merge_change_map(entry.get(key)))
+        return changes
 
 
 class SimulationGoal:
@@ -53,7 +89,8 @@ class GameLogic:
                 command=action_data.get("command", ""),
                 simulated_output=self._get_simulated_output(action_data),
                 requires=action_data.get("requires") or {},
-                effects=action_data.get("effects", {}),
+                inventory_changes=SimulationAction._collect_changes(action_data, "inventory_change"),
+                environment_changes=SimulationAction._collect_changes(action_data, "environment_change"),
                 available=self.are_requirements_fullfilled(action_data.get("requires") or {})
             )
             for action_data in self._iter_action_data(scenario.actions)
@@ -77,9 +114,9 @@ class GameLogic:
 
     @staticmethod
     def _get_simulated_output(action_data: dict) -> str:
-        for produced in action_data.get("produces") or []:
-            if isinstance(produced, dict) and "simulated_output" in produced:
-                return str(produced["simulated_output"]).rstrip("\n")
+        for entry in SimulationAction._iter_produced_entries(action_data):
+            if "simulated_output" in entry:
+                return str(entry["simulated_output"]).rstrip("\n")
         return ""
 
     def are_requirements_fullfilled(self, requirements: dict) -> bool:
@@ -87,6 +124,22 @@ class GameLogic:
             if self.scenario.get_simulation_variable(requirement) != value:
                 return False
         return True
+
+    def execute_action(self, action_id: str) -> SimulationAction:
+        action = self.actions.get(action_id)
+        if action is None:
+            raise ValueError(f"Nieznana akcja: {action_id}")
+        if not action.available:
+            raise ValueError(f"Akcja '{action_id}' jest obecnie niedostepna.")
+
+        # Ustawienie zmiennych powiadamia listenerow (on_scenario_state_change), co
+        # aktualizuje dostepnosc akcji oraz postep celow.
+        for variable_name, value in action.inventory_changes.items():
+            self.scenario.set_inventory_variable(variable_name, value)
+        for variable_name, value in action.environment_changes.items():
+            self.scenario.set_environment_variable(variable_name, value)
+
+        return action
 
     def update_goal_progress(self):
         def update_goal(goal: SimulationGoal) -> bool:
