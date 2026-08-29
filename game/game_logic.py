@@ -143,9 +143,10 @@ class GameLogic:
 
     def update_goal_progress(self):
         def update_goal(goal: SimulationGoal) -> bool:
-            subgoals_achieved = all(
+            subgoal_results = [
                 update_goal(subgoal) for subgoal in goal.subgoals.values()
-            )
+            ]
+            subgoals_achieved = all(subgoal_results)
             goal.achieved = (
                 self.are_requirements_fullfilled(goal.requires) and subgoals_achieved
             )
