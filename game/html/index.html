@@ -14,7 +14,27 @@
         </section>
         <section id="game-screen" hidden>
           <button id="back-to-scenarios" type="button">&larr; Wybor scenariusza</button>
-          <div id="terminal"></div>
+          <div id="game-layout">
+            <div id="terminal-panel">
+              <div id="terminal"></div>
+            </div>
+            <div id="side-panel">
+              <div id="side-tabs" role="tablist">
+                <button class="side-tab" type="button" data-tab="goals" role="tab">Cele</button>
+                <button class="side-tab" type="button" data-tab="actions" role="tab">Akcje</button>
+                <button class="side-tab" type="button" data-tab="upcoming" role="tab">Wkrotce</button>
+              </div>
+              <div class="side-panel-content" data-panel="goals" role="tabpanel">
+                <ul id="goals-list" class="panel-list"></ul>
+              </div>
+              <div class="side-panel-content" data-panel="actions" role="tabpanel">
+                <ul id="actions-list" class="panel-list"></ul>
+              </div>
+              <div class="side-panel-content" data-panel="upcoming" role="tabpanel">
+                <p class="panel-placeholder">Funkcja w przygotowaniu.</p>
+              </div>
+            </div>
+          </div>
         </section>
       </main>
       <script type="module" src="/game.ts"></script>

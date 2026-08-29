@@ -41,10 +41,30 @@ const scenarioStatus = getRequiredElement('scenario-status');
 const gameScreen = getRequiredElement('game-screen');
 const terminalElement = getRequiredElement('terminal');
 const backButton = getRequiredElement('back-to-scenarios');
+const goalsList = getRequiredElement('goals-list');
+const actionsList = getRequiredElement('actions-list');
+const sideTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.side-tab'));
+const sidePanels = Array.from(document.querySelectorAll<HTMLElement>('.side-panel-content'));
 
 let terminal: Terminal | null = null;
 let socket: Socket | null = null;
 let inputBuffer = '';
+
+function setupTabs(): void {
+  for (const tab of sideTabs) {
+    tab.addEventListener('click', () => activateTab(tab.dataset.tab ?? ''));
+  }
+  activateTab('goals');
+}
+
+function activateTab(tabName: string): void {
+  for (const tab of sideTabs) {
+    tab.classList.toggle('active', tab.dataset.tab === tabName);
+  }
+  for (const panel of sidePanels) {
+    panel.hidden = panel.dataset.panel !== tabName;
+  }
+}
 
 async function loadScenarios(): Promise<void> {
   scenarioStatus.textContent = 'Ladowanie scenariuszy...';
@@ -151,36 +171,47 @@ function connectToGameServer(scenarioId: string): void {
 }
 
 function renderState(state: GameState): void {
-  if (!terminal) {
-    return;
-  }
-
-  terminal.writeln('');
-  terminal.writeln('== Cele ==');
+  goalsList.innerHTML = '';
   for (const goal of state.goals) {
-    writeGoal(goal, 0);
+    goalsList.appendChild(buildGoalItem(goal));
   }
 
-  terminal.writeln('');
-  terminal.writeln('== Dostepne akcje ==');
-  for (const action of state.actions) {
-    if (action.available) {
-      terminal.writeln(`  ${action.id} - ${action.description ?? ''}`);
-    }
+  actionsList.innerHTML = '';
+  for (const action of state.actions.filter((candidate) => candidate.available)) {
+    actionsList.appendChild(buildActionItem(action));
   }
-  terminal.write('\r\n> ');
+
+  terminal?.write('\r\n> ');
 }
 
-function writeGoal(goal: Goal, depth: number): void {
-  if (!terminal) {
-    return;
+function buildGoalItem(goal: Goal): HTMLLIElement {
+  const item = document.createElement('li');
+  const label = document.createElement('div');
+  label.className = `goal-item${goal.achieved ? ' achieved' : ''}`;
+  label.textContent = `${goal.achieved ? '[x]' : '[ ]'} ${goal.description || goal.id}`;
+  item.appendChild(label);
+
+  if (goal.subgoals.length > 0) {
+    const sublist = document.createElement('ul');
+    sublist.className = 'goal-subgoals';
+    for (const subgoal of goal.subgoals) {
+      sublist.appendChild(buildGoalItem(subgoal));
+    }
+    item.appendChild(sublist);
   }
-  const indent = '  '.repeat(depth);
-  const mark = goal.achieved ? '[x]' : '[ ]';
-  terminal.writeln(`${indent}${mark} ${goal.description || goal.id}`);
-  for (const subgoal of goal.subgoals) {
-    writeGoal(subgoal, depth + 1);
-  }
+
+  return item;
+}
+
+function buildActionItem(action: ActionInfo): HTMLLIElement {
+  const item = document.createElement('li');
+  const button = document.createElement('button');
+  button.type = 'button';
+  button.className = 'action-item';
+  button.textContent = action.description || action.id;
+  button.addEventListener('click', () => sendAction(action.id));
+  item.appendChild(button);
+  return item;
 }
 
 function closeSocket(): void {
@@ -200,4 +231,5 @@ function returnToScenarioSelect(): void {
 
 backButton.addEventListener('click', returnToScenarioSelect);
 
+setupTabs();
 void loadScenarios();
