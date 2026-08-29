@@ -1,0 +1,48 @@
+flowchart 
+    M["mission"]
+
+    M --> ID["id"]
+    M --> TITLE["title"]
+    M --> DESC["description"]
+    M --> ENV["environment"]
+    M --> INV["inventory"]
+    M --> GOAL["goals"]
+    M --> ACTIONS["actions"]
+
+    %% Environment / Inventory
+    ENV -. "nadzbiór" .-> INV
+
+    %% Goals
+    GOAL --> MG["[1...n] example_goals"]
+    MG --> MDESC["description"]
+    MG --> REQ["requires"]
+    MG --> SUB["subgoals"]
+
+    SUB --> SG["[0...n] named_subgoals"]
+    SG --> SDESC["description"]
+    SG --> SREQ["requires"]
+    SG --> SSUB["subgoals"]
+
+    %% Recursive subgoals
+    SSUB -. "rekurencyjnie" .-> SG
+
+    %% Actions
+    ACTIONS --> ACT["[0...n] example_actions"]
+    ACT --> CMD["command"]
+    ACT --> AREQ["requires"]
+    ACT --> PROD["produces"]
+
+    PROD --> RESULT["[1...n] action_outcomes"]
+    RESULT --> RPROB["probability"]
+    RESULT --> CHANGE["inventory_change"]
+    RESULT --> OUTPUT["simulated_output"]
+
+    %% Styles
+    classDef root fill:#e8f0fe,stroke:#4a6fa5,stroke-width:2px
+    classDef section fill:#f3f3f3,stroke:#777,stroke-width:1.5px
+    classDef field fill:#fff,stroke:#aaa
+    classDef recursive fill:#fff7e6,stroke:#c98a00
+
+    class M root
+    class ENV,INV,GOAL,ACTIONS section
+    class MG,ACT,RESULT recursive

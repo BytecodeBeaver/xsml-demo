@@ -1,0 +1,99 @@
+# TODO: Walidacja formatu czy spełnia reguły YAML(jeszcze przed wpuszczeniem tego do programu)
+mission:
+  id: hardening_linux
+  title: "Zidentyfikowanie potencjalnych luk bezpieczeństwa w systemie Linux"
+  description: "Celem misji jest określenie jakie elementy funkcjonują w systemie i jak można je uszczelnić"
+  environment:
+    - firewall_enabled: false
+    # Środowisko, w którym gracz będzie działał.
+    # Tu są przechowywane informacje o tym co gracz wie.
+    # Część wiedzy dla gracza może być zdefiniowana od samego początku, a część gracz musi odkryć, za pośrednictwem akcji.
+    # Akcje ustawiają zmienne, które są obserwowane w środowisku, a obserwacje są używane do określenia, czy gracz osiągnął cel misji.
+  inventory:
+    # Co wie gracz? Wiedza z części environment jest znana tylko symulacji, natomiast informacje z sekcji inventory są znane zarówno graczowi jak i systemowi
+
+  goals:
+    complete_hardening_of_linux_system: # Cel główny, który gracz musi osiągnąć, aby zakończyć misję sukcesem
+      description: "Zlokalizowano i utwardzono wszystkie dziury bezpieczeństwa systemu"
+      requires: # Sekcje requires w celach i podcelach definiują, jakie obserwacje muszą być spełnione, aby cel został uznany za osiągnięty. Jeśli nic nie jest zdefiniowane, to znaczy że cel zostaje automatycznie osiągnięty gdy osiągnięte zostaną wszystkie podcele
+
+      subgoals: # Podcele definiują się w hierarchii, aby możliwe było osiągnięcie nadrzędnego celu
+        - set_strong_root_password:
+            requires:
+              - changed_root_password: true
+            subgoals:
+              - identify_weak_root_password:
+                  description: "Zidentyfikowano słabe hasło użytkownika"
+                  requires:
+                    - weak_user_password_detected: true
+
+        - activate_firewall:
+            description: "Usługa zapory sieciowej została uruchomiona"
+            requires:
+              - firewall_enabled: true
+            subgoals:
+              - firewall_disabled_detected:
+                  description: "Ustalono, że usługa zapory sieciowej nie jest aktywna"
+                  requires:
+                  - firewall_disabled_detected: true
+
+  actions:
+    check_user_password:
+      command: "echo /root/root_password.txt"
+      requires:
+      produces:
+        - weak_user_password_detected:
+            probability: 1.0
+            inventory_change:
+              - weak_user_password_detected: true
+            simulated_output: |
+              root
+
+    set_strong_root_password:
+      command: "pwgen -s 8 | tee /dev/tty | passwd -s root"
+      requires:
+        - weak_user_password_detected: true
+      produces:
+        - changed_password_to_strong_generated_one:
+            probability: 1.0
+            inventory_change:
+              changed_root_password: true
+            simulated_output: |
+              pnFBg9jB8AlKL3fe
+    check_firewall_status:
+      description: "Sprawdź stan zapory sieciowej"
+      command: "systemctl status firewalld.service"
+      requires:
+      produces:
+        - firewall_status_checked:
+            probability: 1.0
+            inventory_change:
+              - firewall_enabled: false
+              - firewall_status_checked: true
+            simulated_output: |
+              <Firewall status placeholder>
+    enable_firewall:
+      description: "Uruchom usługę zapory sieciowej"
+      command: "systemctl enable firewalld.service --now"
+      requires:
+        - firewall_status_checked: true
+        - firewall_enabled: false
+      produces:
+        - firewall_enabled:
+            probability: 1.0
+            inventory_change:
+              - firewall_enabled: true
+            simulated_output: |
+              <Firewall enabled output placeholder>
+    support:
+      issues:
+        - initial_steps:
+            # Gracz nie wie co zrobić na początek
+            hint: "Sprawdź dostępne akcje"
+            requires:
+              - idle_time: 15
+              - performance: "begineer"
+              - firewall_status_checked: false
+              - weak_user_password_detected: true
+        
+             

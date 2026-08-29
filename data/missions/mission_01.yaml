@@ -1,0 +1,279 @@
+mission:
+  id: lab_active_recon_nmap
+  title: "Aktywny rekonesans hosta z użyciem Nmap"
+  environment:
+    # Środowisko, w którym gracz będzie działał.
+    # Tu są przechowywane informacje o tym co gracz wie.
+    # Część wiedzy dla gracza może być zdefiniowana od samego początku, a część gracz musi odkryć, za pośrednictwem akcji.
+    # Akcje ustawiają zmienne, które są obserwowane w środowisku, a obserwacje są używane do określenia, czy gracz osiągnął cel misji.
+
+  description: >
+    Celem misji jest wykonanie podstawowego aktywnego rekonesansu hosta 192.168.2.23: sprawdzenie osiągalności hosta,
+    identyfikacja otwartych portów, rozpoznanie usług i przygotowanie krótkiego
+    raportu.
+
+  scenario:
+      goal:
+        complete_recon_report: # Cel główny, który gracz musi osiągnąć, aby zakończyć misję sukcesem
+          description: "Przygotować raport z aktywnego rekonesansu"
+          conditions: # Sekcje conditions w celach i podcelach definiują, jakie obserwacje muszą być spełnione, aby cel został uznany za osiągnięty
+            - report_completed: true
+
+          subgoals: # Podcele definiują się w hierarchii, aby możliwe było osiągnięcie nadrzędnego celu
+            - identify_reachable_host:
+                description: "Ustalono czy host 192.168.2.23 jest osiągalny"
+                conditions:
+                  - target_reachable: true
+
+            - identify_open_ports:
+                description: "Ustalono, które porty TCP są otwarte"
+                conditions:
+                  - open_ports_known: true
+
+            - identify_services:
+                description: "Ustalono, które usługi działają na otwartych portach"
+                conditions:
+                  - services_identified: true
+
+      start_node: start
+
+      nodes:
+
+        start:
+          description: "Gracz zna adres IP celu, ale nie wie, czy host odpowiada."
+          observations:
+            network_access: true
+            target_ip_known: true
+            target_reachable: unknown
+            open_ports_known: false
+            services_identified: false
+            report_completed: false
+
+          available_actions: # Możliwe akcje powinny być określane na podstawie aktualnego stanu środowiska zamiast tego.
+            - ping_host
+            - nmap_basic_scan
+
+        host_checked:
+          description: "Host odpowiada na ping. Można przejść do skanowania portów."
+          observations:
+            target_reachable: true
+            open_ports_known: false
+            services_identified: false
+            report_completed: false
+
+          available_actions:
+            - nmap_basic_scan
+
+        ports_discovered:
+          description: "Znane są otwarte porty, ale nie rozpoznano jeszcze wersji usług."
+          observations:
+            target_reachable: true
+            open_ports_known: true
+            services_identified: false
+            report_completed: false
+
+          available_actions:
+            - nmap_service_detection
+
+        services_discovered:
+          description: "Rozpoznano usługi i ich wersje. Można przygotować raport."
+          observations:
+            target_reachable: true
+            open_ports_known: true
+            services_identified: true
+            report_completed: false
+
+          available_actions:
+            - write_recon_report
+
+        report_done:
+          description: "Raport został przygotowany. Misja zakończona sukcesem."
+          observations:
+            target_reachable: true
+            open_ports_known: true
+            services_identified: true
+            report_completed: true
+
+          terminal: true
+          result: success
+
+      transitions:
+
+        - from: start
+          action: ping_host
+          to: host_checked
+
+        - from: start
+          action: nmap_basic_scan
+          to: ports_discovered
+
+        - from: host_checked
+          action: nmap_basic_scan
+          to: ports_discovered
+
+        - from: ports_discovered
+          action: nmap_service_detection
+          to: services_discovered
+
+        - from: services_discovered
+          action: write_recon_report
+          to: report_done
+          
+  actions:
+
+    ping_host:
+      # Czasami ICMP może być zablokowany, więc nie zawsze host będzie odpowiadał na ping.
+      # W takim przypadku gracz może przejść do skanowania portów TCP
+      # nmap może wykryć host nawet jeśli ICMP jest zablokowany.
+      description: "Check whether the target host responds to ICMP echo requests"
+      command_examples:
+        - "ping -c 3 192.168.2.23"
+
+      requires:
+        - network_access
+        - target_ip_known
+
+      produces:
+        - target_reachable
+
+      simulated_output:
+        success: |
+          PING 192.168.2.23 (192.168.2.23) 56(84) bytes of data.
+          64 bytes from 192.168.2.23: icmp_seq=1 ttl=64 time=0.52 ms
+          64 bytes from 192.168.2.23: icmp_seq=2 ttl=64 time=0.49 ms
+          64 bytes from 192.168.2.23: icmp_seq=3 ttl=64 time=0.51 ms
+
+          --- 192.168.2.23 ping statistics ---
+          3 packets transmitted, 3 received, 0% packet loss
+
+    nmap_basic_scan:
+      description: "Run a basic TCP port scan against the target host"
+      command_examples:
+        - "nmap 192.168.2.23"
+
+      requires:
+        - network_access
+        - target_ip_known
+
+      produces:
+        - open_ports_known
+
+      simulated_output:
+        success: |
+          Starting Nmap scan for 192.168.2.23
+
+          PORT    STATE  SERVICE
+          22/tcp  open   ssh
+          80/tcp  open   http
+          443/tcp closed https
+
+          Nmap done: 1 IP address scanned
+
+    nmap_service_detection:
+      description: "Run service/version detection using Nmap"
+      command_examples:
+        - "nmap -sV 192.168.2.23"
+
+      requires:
+        - open_ports_known
+
+      produces:
+        - services_identified
+
+      simulated_output:
+        success: |
+          Starting Nmap service detection for 192.168.2.23
+
+          PORT    STATE  SERVICE  VERSION
+          22/tcp  open   ssh      OpenSSH 8.2
+          80/tcp  open   http     Apache httpd 2.4
+          443/tcp closed https
+
+          Service detection performed.
+
+    write_recon_report:
+      description: "Prepare a short reconnaissance summary"
+      command_examples:
+        - "report create"
+        - "cat report.txt"
+
+      requires:
+        - target_reachable
+        - open_ports_known
+        - services_identified
+
+      produces:
+        - report_completed
+
+      simulated_output:
+        success: |
+          Reconnaissance report created.
+
+          Target: 192.168.2.23
+          Reachable: yes
+          Open ports:
+            - 22/tcp ssh OpenSSH 8.2
+            - 80/tcp http Apache httpd 2.4
+          Closed ports:
+            - 443/tcp https
+
+          Recommendation:
+            Continue with service-specific enumeration.
+  
+  inventory:
+    assets:
+
+      network:
+        id: lab_net_01
+        cidr: 192.168.2.0/24
+        description: "Lokalna sieć laboratoryjna"
+
+      hosts:
+
+        attacker_machine:
+          ip: 192.168.2.10
+          role: learner_terminal
+          os: linux
+          tools:
+            - nmap
+            - ping
+            - grep
+            - cat
+
+        target_host:
+          ip: 192.168.2.23
+          role: target
+          os: linux
+          reachable: true
+          hostname: training-node-23
+
+    services:
+
+      ssh:
+        host: target_host
+        port: 22
+        protocol: tcp
+        state: open
+        version: OpenSSH_8.2
+
+      http:
+        host: target_host
+        port: 80
+        protocol: tcp
+        state: open
+        version: Apache httpd 2.4
+
+      https:
+        host: target_host
+        port: 443
+        protocol: tcp
+        state: closed
+
+    knowledge_initial:
+
+      network_access: true
+      target_ip_known: true
+      target_reachable: unknown
+      open_ports_known: false
+      services_identified: false
+      report_completed: false

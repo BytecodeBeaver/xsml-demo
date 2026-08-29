@@ -1,0 +1,94 @@
+meta:
+  dialect: "xsml"
+  version: "0.1"
+scenario:
+  id: hardening_linux
+  title: "Zidentyfikowanie potencjalnych luk bezpieczeństwa w systemie Linux"
+  description: "Celem misji jest określenie jakie elementy funkcjonują w systemie i jak można je uszczelnić"
+  environment:
+    firewall_enabled: false
+  inventory:
+
+  goals:
+    complete_hardening_of_linux_system:
+      description: "Zlokalizowano i utwardzono wszystkie dziury bezpieczeństwa systemu"
+      requires:
+      subgoals:
+        - id: "set_strong_root_password"
+          description: "Ustalono silne hasło dla użytkownika root"
+          requires:
+            - changed_root_password: true
+          subgoals:
+            - identify_weak_root_password:
+                description: "Zidentyfikowano słabe hasło użytkownika"
+                requires:
+                  - weak_user_password_detected: true
+
+        - id: "enable_firewall"
+          description: "Usługa zapory sieciowej została uruchomiona"
+          requires:
+            firewall_enabled: true
+          subgoals:
+            - id: "firewall_disabled_detected"
+              description: "Ustalono, że usługa zapory sieciowej nie jest aktywna"
+              requires:
+                firewall_disabled_detected: true
+
+  actions:
+    - id: "check_user_password"
+      command: "echo /root/root_password.txt"
+      requires:
+      produces:
+        - id: "weak_user_password_detected"
+          probability: 1.0
+          inventory_change:
+            weak_user_password_detected: true
+          simulated_output: |
+            root
+    - id: "set_strong_root_password"
+      command: "pwgen -s 8 | tee /dev/tty | passwd -s root"
+      requires:
+        weak_user_password_detected: true
+      produces:
+        - id: "changed_password_to_strong_generated_one"
+          probability: 1.0
+          inventory_change:
+            changed_root_password: true
+          simulated_output: |
+            pnFBg9jB8AlKL3fe
+    - id: "check_firewall_status"
+      description: "Sprawdź stan zapory sieciowej"
+      command: "systemctl status firewalld.service"
+      requires:
+      produces:
+        - id: "firewall_status_checked"
+          probability: 1.0
+          inventory_change:
+            firewall_enabled: false
+            firewall_status_checked: true
+          simulated_output: |
+            <Firewall status placeholder>
+    - id: "enable_firewall"
+      description: "Uruchom usługę zapory sieciowej"
+      command: "systemctl enable firewalld.service --now"
+      requires:
+        firewall_status_checked: true
+        firewall_enabled: false
+      produces:
+        - id: "firewall_enabled"
+          probability: 1.0
+          inventory_change:
+            firewall_enabled: true
+          simulated_output: |
+            <Firewall enabled output placeholder>
+  support:
+    issues:
+      - initial_step:
+          hint: "Sprawdź dostępne akcje"
+          requires:
+            idle_time: 15
+            performance: "begineer" # Po co to?
+            firewall_status_checked: false
+            weak_user_password_detected: true
+
+
