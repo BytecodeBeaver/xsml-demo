@@ -10,19 +10,19 @@ scenario:
   inventory:
 
   goals:
-    complete_hardening_of_linux_system:
+    - id: "complete_hardening_of_linux_system"
       description: "Zlokalizowano i utwardzono wszystkie dziury bezpieczeństwa systemu"
       requires:
       subgoals:
         - id: "set_strong_root_password"
           description: "Ustalono silne hasło dla użytkownika root"
           requires:
-            - changed_root_password: true
+            changed_root_password: true
           subgoals:
-            - identify_weak_root_password:
-                description: "Zidentyfikowano słabe hasło użytkownika"
-                requires:
-                  - weak_user_password_detected: true
+            - id: "identify_weak_root_password"
+              description: "Zidentyfikowano słabe hasło użytkownika"
+              requires:
+                weak_user_password_detected: true
 
         - id: "enable_firewall"
           description: "Usługa zapory sieciowej została uruchomiona"

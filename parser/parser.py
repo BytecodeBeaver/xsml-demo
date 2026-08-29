@@ -8,19 +8,60 @@ class SimulationScenario:
         self.goals: dict = scenario_data.get("goals")
         self.actions: dict = scenario_data.get("actions")
 
+    def get_inventory_variable(self, variable_name: str):
+        return self.inventory.get(variable_name)
+
+    def get_environment_variable(self, variable_name: str):
+        return self.environment.get(variable_name)
+
+    def get_simulation_variable(self, variable_name: str):
+        # Albo zwróć wartość z inventory, albo z environment, jeśli nie ma w inventory
+        inventory_value = self.inventory.get(variable_name)
+        if inventory_value is not None:
+            return inventory_value
+        else:
+            return self.environment.get(variable_name)
+
 class XSMLParser:
     @staticmethod
     def construct_goal_tree(goals):
-        # Funkcja rekurencyjna do konstruowania drzewa celów
-        def build_tree(goal):
-            if isinstance(goal, dict):
-                return {k: build_tree(v) for k, v in goal.items()}
-            elif isinstance(goal, list):
-                return [build_tree(g) for g in goal]
-            else:
-                return goal
+        def build_tree(goal, path="goals"):
+            if isinstance(goal, list):
+                return [build_tree(subgoal, f"{path}[{index}]") for index, subgoal in enumerate(goal)]
 
-        return build_tree(goals)
+            if not isinstance(goal, dict):
+                raise ValueError(f"Cel '{path}' jest blednie zdefiniowany.")
+
+            missing_sections = [
+                section for section in ("id", "description", "requires") if section not in goal
+            ]
+            if missing_sections:
+                goal_name = goal.get("id", path)
+                sections = ", ".join(f"'{section}'" for section in missing_sections)
+                raise ValueError(
+                    f"Cel '{goal_name}' jest blednie zdefiniowany: brak sekcji {sections}."
+                )
+
+            goal_tree = dict(goal)
+            subgoals = goal.get("subgoals")
+            if subgoals:
+                goal_tree["subgoals"] = build_tree(
+                    subgoals, f"{path}.{goal['id']}.subgoals"
+                )
+            else:
+                goal_tree["subgoals"] = {}
+            return goal_tree
+
+        if isinstance(goals, list):
+            return build_tree(goals)
+
+        if isinstance(goals, dict):
+            return {
+                goal_id: build_tree(goal, f"goals.{goal_id}")
+                for goal_id, goal in goals.items()
+            }
+
+        raise ValueError("Sekcja 'goals' musi byc lista celow lub slownikiem celow.")
 
     @staticmethod
     def parse(yaml_data):
@@ -41,11 +82,11 @@ class XSMLParser:
 
         scenario_title = scenario_root.get("title")
         if not scenario_title:
-            raise ValueError("Brak tytułu scenariusza w sekcji 'scenario'.")
+            raise ValueError("Niezdefiniowano tytułu scenariusza w sekcji 'scenario'.")
 
         scenario_description = scenario_root.get("description")
         if not scenario_description:
-            raise ValueError("Brak opisu scenariusza w sekcji 'scenario'.")
+            raise ValueError("Niezdefiniowano opisu scenariusza w sekcji 'scenario'.")
 
         if "inventory" not in scenario_root:
             raise ValueError("Brak sekcji 'inventory' w scenariuszu.")
@@ -57,11 +98,11 @@ class XSMLParser:
 
         scenario_goals = scenario_root.get("goals", {})
         if not scenario_goals:
-            raise ValueError("Brak sekcji 'goals' w scenariuszu.")
+            raise ValueError("Brak sekcji lub pusta sekcja 'goals' w scenariuszu.")
 
         scenario_actions = scenario_root.get("actions", {})
         if not scenario_actions:
-            raise ValueError("Brak sekcji 'actions' w scenariuszu.")
+            raise ValueError("Brak sekcji lub pusta sekcja 'actions' w scenariuszu.")
     
         scenario = {
             "id": scenario_id,
