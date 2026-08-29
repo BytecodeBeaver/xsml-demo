@@ -3,8 +3,8 @@ class SimulationScenario:
         self.id: str = scenario_data.get("id")
         self.title: str = scenario_data.get("title")
         self.description: str = scenario_data.get("description")
-        self.inventory: dict = scenario_data.get("inventory")
-        self.environment: dict = scenario_data.get("environment")
+        self.inventory: dict = scenario_data.get("inventory") or {}
+        self.environment: dict = scenario_data.get("environment") or {}
         self.goals: dict = scenario_data.get("goals")
         self.actions: dict = scenario_data.get("actions")
 
