@@ -186,9 +186,19 @@ function renderState(state: GameState): void {
 
 function buildGoalItem(goal: Goal): HTMLLIElement {
   const item = document.createElement('li');
-  const label = document.createElement('div');
+  const label = document.createElement('label');
   label.className = `goal-item${goal.achieved ? ' achieved' : ''}`;
-  label.textContent = `${goal.achieved ? '[x]' : '[ ]'} ${goal.description || goal.id}`;
+
+  const checkbox = document.createElement('input');
+  checkbox.type = 'checkbox';
+  checkbox.checked = goal.achieved;
+  checkbox.disabled = true;
+
+  const text = document.createElement('span');
+  text.textContent = goal.description || goal.id;
+
+  label.appendChild(checkbox);
+  label.appendChild(text);
   item.appendChild(label);
 
   if (goal.subgoals.length > 0) {
