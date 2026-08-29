@@ -1,4 +1,5 @@
 import { Terminal } from '@xterm/xterm';
+import { FitAddon } from '@xterm/addon-fit';
 import '@xterm/xterm/css/xterm.css';
 import { io, Socket } from 'socket.io-client';
 import './style.css';
@@ -53,8 +54,51 @@ const NICKNAME_STORAGE_KEY = 'game.nickname';
 const TERMINAL_PROMPT = 'root@root:~# ';
 
 let terminal: Terminal | null = null;
+let fitAddon: FitAddon | null = null;
+let resizeObserver: ResizeObserver | null = null;
 let socket: Socket | null = null;
 let inputBuffer = '';
+
+function resizeTerminal(): void {
+  if (!terminal || !fitAddon) {
+    return;
+  }
+
+  const container = terminalElement.parentElement ?? terminalElement;
+  const { width, height } = container.getBoundingClientRect();
+
+  if (width === 0 || height === 0) {
+    return;
+  }
+
+  fitAddon.fit();
+}
+
+function setupTerminal(): void {
+  if (terminal) {
+    resizeTerminal();
+    return;
+  }
+
+  terminal = new Terminal({
+    cursorBlink: true,
+    scrollback: 2000,
+    convertEol: true,
+  });
+
+  fitAddon = new FitAddon();
+  terminal.loadAddon(fitAddon);
+  terminal.open(terminalElement);
+  terminal.onData(handleTerminalInput);
+
+  resizeObserver = new ResizeObserver(() => {
+    window.requestAnimationFrame(() => resizeTerminal());
+  });
+
+  resizeObserver.observe(terminalElement.parentElement ?? terminalElement);
+  window.addEventListener('resize', resizeTerminal);
+  requestAnimationFrame(() => resizeTerminal());
+}
 
 function restoreNickname(): void {
   const savedNickname = localStorage.getItem(NICKNAME_STORAGE_KEY);
@@ -128,13 +172,8 @@ function startGame(scenarioId: string, nickname: string): void {
   gameScreen.hidden = false;
   activeNicknameLabel.textContent = `Gracz: ${nickname}`;
 
-  if (!terminal) {
-    terminal = new Terminal();
-    terminal.open(terminalElement);
-    terminal.onData(handleTerminalInput);
-  } else {
-    terminal.reset();
-  }
+  setupTerminal();
+  terminal?.reset();
 
   connectToGameServer(scenarioId, nickname);
 }
