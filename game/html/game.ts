@@ -50,6 +50,7 @@ const sidePanels = Array.from(document.querySelectorAll<HTMLElement>('.side-pane
 
 const NICKNAME_PATTERN = /^[A-Za-z0-9 _-]{1,24}$/;
 const NICKNAME_STORAGE_KEY = 'game.nickname';
+const TERMINAL_PROMPT = 'root@root:~# ';
 
 let terminal: Terminal | null = null;
 let socket: Socket | null = null;
@@ -178,6 +179,17 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
     terminal?.writeln(`Polaczono z serwerem gry (scenariusz: ${scenarioId})`);
   });
 
+  socket.on('terminal_output', (payload: { command: string; simulated_output: string }) => {
+    if (!terminal) {
+      return;
+    }
+
+    terminal.write(`${payload.command}\r\n`);
+    if (payload.simulated_output) {
+      terminal.write(payload.simulated_output.replace(/\n/g, '\r\n'));
+    }
+  });
+
   socket.on('state', (state: GameState) => {
     renderState(state);
   });
@@ -206,7 +218,7 @@ function renderState(state: GameState): void {
     actionsList.appendChild(buildActionItem(action));
   }
 
-  terminal?.write('\r\n> ');
+  terminal?.write(`\r\n${TERMINAL_PROMPT}`);
 }
 
 // Top-level goals are always shown; their unfinished subgoals are nested underneath.

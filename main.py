@@ -125,6 +125,10 @@ def create_app() -> Tuple[Flask, SocketIO]:
         for variable_name, value in (action.effects or {}).items():
             game_logic.scenario.set_inventory_variable(variable_name, value)
 
+        emit('terminal_output', {
+            "command": action.command,
+            "simulated_output": action.simulated_output,
+        })
         emit('state', serialize_state(game_logic))
 
     return app, socketio

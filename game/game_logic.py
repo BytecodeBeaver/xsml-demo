@@ -2,8 +2,10 @@ from parser.parser import SimulationScenario
 from typing import Dict
 
 class SimulationAction:
-     def __init__(self, id, description, requires, effects, available=False):
+    def __init__(self, id, description, command, simulated_output, requires, effects, available=False):
         self.description: str = description
+        self.command: str = command
+        self.simulated_output: str = simulated_output
         self.requires: dict = requires
         self.effects: dict = effects
         self.available: bool = available
@@ -48,6 +50,8 @@ class GameLogic:
             action_data["id"]: SimulationAction(
                 id=action_data["id"],
                 description=action_data.get("description"),
+                command=action_data.get("command", ""),
+                simulated_output=self._get_simulated_output(action_data),
                 requires=action_data.get("requires") or {},
                 effects=action_data.get("effects", {}),
                 available=self.are_requirements_fullfilled(action_data.get("requires") or {})
@@ -70,6 +74,13 @@ class GameLogic:
         if isinstance(actions, dict):
             return actions.values()
         raise ValueError("Akcje musza byc lista lub slownikiem akcji.")
+
+    @staticmethod
+    def _get_simulated_output(action_data: dict) -> str:
+        for produced in action_data.get("produces") or []:
+            if isinstance(produced, dict) and "simulated_output" in produced:
+                return str(produced["simulated_output"]).rstrip("\n")
+        return ""
 
     def are_requirements_fullfilled(self, requirements: dict) -> bool:
         for requirement, value in requirements.items():
