@@ -198,7 +198,7 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
 function renderState(state: GameState): void {
   goalsList.innerHTML = '';
   for (const goal of state.goals) {
-    goalsList.appendChild(buildGoalItem(goal));
+    goalsList.appendChild(buildTopGoalNode(goal));
   }
 
   actionsList.innerHTML = '';
@@ -207,6 +207,33 @@ function renderState(state: GameState): void {
   }
 
   terminal?.write('\r\n> ');
+}
+
+// Top-level goals are always shown; their unfinished subgoals are nested underneath.
+function buildTopGoalNode(goal: Goal): HTMLLIElement {
+  const item = buildGoalItem(goal);
+  const subgoalsPending = goal.subgoals.length > 0 && !goal.subgoals.every((subgoal) => subgoal.achieved);
+  if (subgoalsPending) {
+    const sublist = document.createElement('ul');
+    sublist.className = 'goal-subgoals';
+    for (const subgoal of goal.subgoals) {
+      for (const node of buildGoalNodes(subgoal)) {
+        sublist.appendChild(node);
+      }
+    }
+    item.appendChild(sublist);
+  }
+  return item;
+}
+
+// A goal stays hidden (its subgoals surface in its place) until all its subgoals are achieved.
+function buildGoalNodes(goal: Goal): HTMLLIElement[] {
+  const unlocked = goal.subgoals.length === 0 || goal.subgoals.every((subgoal) => subgoal.achieved);
+  if (!unlocked) {
+    return goal.subgoals.flatMap((subgoal) => buildGoalNodes(subgoal));
+  }
+
+  return [buildGoalItem(goal)];
 }
 
 function buildGoalItem(goal: Goal): HTMLLIElement {
@@ -225,15 +252,6 @@ function buildGoalItem(goal: Goal): HTMLLIElement {
   label.appendChild(checkbox);
   label.appendChild(text);
   item.appendChild(label);
-
-  if (goal.subgoals.length > 0) {
-    const sublist = document.createElement('ul');
-    sublist.className = 'goal-subgoals';
-    for (const subgoal of goal.subgoals) {
-      sublist.appendChild(buildGoalItem(subgoal));
-    }
-    item.appendChild(sublist);
-  }
 
   return item;
 }
