@@ -9,11 +9,18 @@
       <main id="app">
         <section id="scenario-screen">
           <h1>Wybierz scenariusz</h1>
+          <div id="nickname-field">
+            <label for="nickname-input">Nick</label>
+            <input id="nickname-input" type="text" maxlength="24" placeholder="Wpisz swoj nick" autocomplete="off" />
+          </div>
           <p id="scenario-status"></p>
           <ul id="scenario-list"></ul>
         </section>
         <section id="game-screen" hidden>
-          <button id="back-to-scenarios" type="button">&larr; Wybor scenariusza</button>
+          <div id="game-header">
+            <button id="back-to-scenarios" type="button">&larr; Wybor scenariusza</button>
+            <span id="active-nickname"></span>
+          </div>
           <div id="game-layout">
             <div id="terminal-panel">
               <div id="terminal"></div>

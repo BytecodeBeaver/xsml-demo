@@ -88,13 +88,16 @@ class GameLogic:
             return goal.achieved
 
         for goal in self.goals.values():
-            update_goal(goal)
+            print(f"Zaktualizowano postęp celu {goal.id}. Nowa wartość: {update_goal(goal)}")
 
     def update_available_actions(self):
         for action_name, action in self.actions.items():
             # Check if action requires are met, if yes mark it as available, otherwise mark it as unavailable    
             action.available = self.are_requirements_fullfilled(action.requires)
-        
+            if action.available:
+                print(f"Akcja {action_name} jest teraz dostępna.")
+            else:
+                print(f"Akcja {action_name} jest teraz niedostępna.")
 
     def on_scenario_state_change(self, scope: str, variable_name: str, value):
         self.update_available_actions()

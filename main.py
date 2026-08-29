@@ -1,5 +1,6 @@
 import glob
 import os
+import re
 from typing import Dict, Tuple
 
 import yaml
@@ -10,6 +11,7 @@ from parser.parser import SimulationScenario, XSMLParser
 from game.game_logic import GameLogic, SimulationGoal
 
 MISSIONS_DIR = os.path.join(os.path.dirname(__file__), 'data', 'missions')
+NICKNAME_PATTERN = re.compile(r'^[A-Za-z0-9 _-]{1,24}$')
 
 
 def discover_scenarios() -> Dict[str, str]:
@@ -54,8 +56,11 @@ def create_app() -> Tuple[Flask, SocketIO]:
     socketio = SocketIO(app)
 
     scenario_paths = discover_scenarios()
-    # Per-connection game state, keyed by socket session id.
-    sessions: Dict[str, GameLogic] = {}
+    # Game state per (nickname, scenario_id), so progress survives reconnects and is
+    # separated between players sharing the same scenario.
+    player_sessions: Dict[Tuple[str, str], GameLogic] = {}
+    # Maps a live socket connection to the player session it is currently attached to.
+    sid_to_key: Dict[str, Tuple[str, str]] = {}
 
     @app.route('/')
     def index():
@@ -81,18 +86,29 @@ def create_app() -> Tuple[Flask, SocketIO]:
             emit('error', {"message": f"Nieznany scenariusz: {scenario_id}"})
             return False
 
-        scenario = load_scenario(path)
-        game_logic = GameLogic(scenario)
-        sessions[request.sid] = game_logic
+        nickname = (request.args.get('nickname') or '').strip()
+        if not NICKNAME_PATTERN.match(nickname):
+            emit('error', {"message": "Nieprawidlowy nick (1-24 znakow: litery, cyfry, spacja, - lub _)."})
+            return False
+
+        key = (nickname, scenario_id)
+        game_logic = player_sessions.get(key)
+        if game_logic is None:
+            game_logic = GameLogic(load_scenario(path))
+            player_sessions[key] = game_logic
+
+        sid_to_key[request.sid] = key
         emit('state', serialize_state(game_logic))
 
     @socketio.on('disconnect', namespace='/ws/game')
     def handle_disconnect():
-        sessions.pop(request.sid, None)
+        # Player progress is kept in player_sessions so the same nickname can resume later.
+        sid_to_key.pop(request.sid, None)
 
     @socketio.on('action', namespace='/ws/game')
     def handle_action(data):
-        game_logic = sessions.get(request.sid)
+        key = sid_to_key.get(request.sid)
+        game_logic = player_sessions.get(key) if key else None
         if game_logic is None:
             emit('error', {"message": "Brak aktywnej sesji gry."})
             return

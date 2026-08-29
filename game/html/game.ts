@@ -38,7 +38,9 @@ function getRequiredElement(id: string): HTMLElement {
 const scenarioScreen = getRequiredElement('scenario-screen');
 const scenarioList = getRequiredElement('scenario-list');
 const scenarioStatus = getRequiredElement('scenario-status');
+const nicknameInput = getRequiredElement('nickname-input') as HTMLInputElement;
 const gameScreen = getRequiredElement('game-screen');
+const activeNicknameLabel = getRequiredElement('active-nickname');
 const terminalElement = getRequiredElement('terminal');
 const backButton = getRequiredElement('back-to-scenarios');
 const goalsList = getRequiredElement('goals-list');
@@ -46,9 +48,19 @@ const actionsList = getRequiredElement('actions-list');
 const sideTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.side-tab'));
 const sidePanels = Array.from(document.querySelectorAll<HTMLElement>('.side-panel-content'));
 
+const NICKNAME_PATTERN = /^[A-Za-z0-9 _-]{1,24}$/;
+const NICKNAME_STORAGE_KEY = 'game.nickname';
+
 let terminal: Terminal | null = null;
 let socket: Socket | null = null;
 let inputBuffer = '';
+
+function restoreNickname(): void {
+  const savedNickname = localStorage.getItem(NICKNAME_STORAGE_KEY);
+  if (savedNickname) {
+    nicknameInput.value = savedNickname;
+  }
+}
 
 function setupTabs(): void {
   for (const tab of sideTabs) {
@@ -89,7 +101,7 @@ async function loadScenarios(): Promise<void> {
       button.type = 'button';
       button.className = 'scenario-option';
       button.innerHTML = `<strong>${scenario.title}</strong><span>${scenario.description}</span>`;
-      button.addEventListener('click', () => startGame(scenario.id));
+      button.addEventListener('click', () => tryStartGame(scenario.id));
       item.appendChild(button);
       scenarioList.appendChild(item);
     }
@@ -98,9 +110,22 @@ async function loadScenarios(): Promise<void> {
   }
 }
 
-function startGame(scenarioId: string): void {
+function tryStartGame(scenarioId: string): void {
+  const nickname = nicknameInput.value.trim();
+  if (!NICKNAME_PATTERN.test(nickname)) {
+    scenarioStatus.textContent = 'Podaj nick (1-24 znakow: litery, cyfry, spacja, - lub _).';
+    nicknameInput.focus();
+    return;
+  }
+
+  localStorage.setItem(NICKNAME_STORAGE_KEY, nickname);
+  startGame(scenarioId, nickname);
+}
+
+function startGame(scenarioId: string, nickname: string): void {
   scenarioScreen.hidden = true;
   gameScreen.hidden = false;
+  activeNicknameLabel.textContent = `Gracz: ${nickname}`;
 
   if (!terminal) {
     terminal = new Terminal();
@@ -110,7 +135,7 @@ function startGame(scenarioId: string): void {
     terminal.reset();
   }
 
-  connectToGameServer(scenarioId);
+  connectToGameServer(scenarioId, nickname);
 }
 
 function handleTerminalInput(data: string): void {
@@ -144,10 +169,10 @@ function sendAction(actionId: string): void {
   socket.emit('action', { action_id: actionId });
 }
 
-function connectToGameServer(scenarioId: string): void {
+function connectToGameServer(scenarioId: string, nickname: string): void {
   closeSocket();
 
-  socket = io('/ws/game', { query: { scenario: scenarioId } });
+  socket = io('/ws/game', { query: { scenario: scenarioId, nickname } });
 
   socket.on('connect', () => {
     terminal?.writeln(`Polaczono z serwerem gry (scenariusz: ${scenarioId})`);
@@ -241,5 +266,6 @@ function returnToScenarioSelect(): void {
 
 backButton.addEventListener('click', returnToScenarioSelect);
 
+restoreNickname();
 setupTabs();
 void loadScenarios();
