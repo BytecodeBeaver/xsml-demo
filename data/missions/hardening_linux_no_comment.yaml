@@ -36,6 +36,7 @@ scenario:
 
   actions:
     - id: "check_user_password"
+      description: "Sprawdź, czy użytkownik root ma słabe hasło"
       command: "echo /root/root_password.txt"
       requires:
       produces:
@@ -46,6 +47,7 @@ scenario:
           simulated_output: |
             root
     - id: "set_strong_root_password"
+      description: "Ustal silne hasło dla użytkownika root"
       command: "pwgen -s 8 | tee /dev/tty | passwd -s root"
       requires:
         weak_user_password_detected: true
