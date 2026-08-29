@@ -9,6 +9,14 @@ __pycache__/
 venv/
 env/
 
+# Node.js / Vite / TypeScript
+node_modules/
+.vite/
+*.tsbuildinfo
+
+# Generated game / HTML files
+game/html/dist/
+
 # Distribution / packaging
 build/
 dist/
@@ -34,3 +42,4 @@ htmlcov/
 # OS files
 .DS_Store
 Thumbs.db
+

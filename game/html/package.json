@@ -1,0 +1,24 @@
+{
+  "name": "html",
+  "version": "1.0.0",
+  "description": "",
+  "main": "game.ts",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "@xterm/xterm": "^6.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^26.4.0",
+    "typescript": "^7.0.2",
+    "vite": "^8.2.2"
+  }
+}
