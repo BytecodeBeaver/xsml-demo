@@ -28,6 +28,11 @@ interface GameState {
   actions: ActionInfo[];
 }
 
+interface Hint {
+  id: string;
+  hint: string;
+}
+
 function getRequiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) {
@@ -46,6 +51,7 @@ const terminalElement = getRequiredElement('terminal');
 const backButton = getRequiredElement('back-to-scenarios');
 const goalsList = getRequiredElement('goals-list');
 const actionsList = getRequiredElement('actions-list');
+const hintsList = getRequiredElement('hints-list');
 const sideTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.side-tab'));
 const sidePanels = Array.from(document.querySelectorAll<HTMLElement>('.side-panel-content'));
 
@@ -58,6 +64,7 @@ let fitAddon: FitAddon | null = null;
 let resizeObserver: ResizeObserver | null = null;
 let socket: Socket | null = null;
 let inputBuffer = '';
+let hintsRefreshInterval: number | null = null;
 
 function resizeTerminal(): void {
   if (!terminal || !fitAddon) {
@@ -233,6 +240,10 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
     renderState(state);
   });
 
+  socket.on('hints', (payload: { hints: Hint[] }) => {
+    renderHints(payload.hints);
+  });
+
   socket.on('error', (payload: { message: string }) => {
     terminal?.writeln(`\r\nBlad: ${payload.message}`);
   });
@@ -244,6 +255,10 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
   socket.on('connect_error', () => {
     terminal?.writeln('\r\nNie udalo sie polaczyc z serwerem gry.');
   });
+
+  hintsRefreshInterval = window.setInterval(() => {
+    socket?.emit('hints_request');
+  }, 1000);
 }
 
 function renderState(state: GameState): void {
@@ -306,7 +321,23 @@ function buildActionItem(action: ActionInfo): HTMLLIElement {
   return item;
 }
 
+function renderHints(hints: Hint[]): void {
+  hintsList.innerHTML = '';
+  for (const hint of hints) {
+    const item = document.createElement('li');
+    item.className = 'hint-item';
+    item.tabIndex = 0;
+    item.setAttribute('aria-label', 'Podpowiedz');
+    item.textContent = hint.hint;
+    hintsList.appendChild(item);
+  }
+}
+
 function closeSocket(): void {
+  if (hintsRefreshInterval !== null) {
+    window.clearInterval(hintsRefreshInterval);
+    hintsRefreshInterval = null;
+  }
   if (socket) {
     socket.removeAllListeners();
     socket.close();

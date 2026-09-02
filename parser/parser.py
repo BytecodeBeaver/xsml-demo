@@ -7,6 +7,7 @@ class SimulationScenario:
         self.worldstate: dict = scenario_data.get("worldstate") or {}
         self.goals: dict = scenario_data.get("goals")
         self.actions: dict = scenario_data.get("actions")
+        self.support: dict = scenario_data.get("support") or {}
 
         # Observer
         self._listeners = []
@@ -113,6 +114,26 @@ class XSMLParser:
                         raise ValueError(f"Sekcja '{scope}' w zmianie musi byc slownikiem.")
 
     @staticmethod
+    def validate_support(support):
+        if support is None:
+            return
+        if not isinstance(support, dict):
+            raise ValueError("Sekcja 'support' musi byc slownikiem.")
+
+        problems = support.get("problems", [])
+        if not isinstance(problems, list):
+            raise ValueError("Sekcja 'support.problems' musi byc lista.")
+
+        for problem in problems:
+            if not isinstance(problem, dict) or not problem.get("id") or "hint" not in problem:
+                raise ValueError("Kazda podpowiedz musi zawierac 'id' i 'hint'.")
+            XSMLParser.validate_requires(problem.get("requires"), problem["id"])
+
+            idle_time = (problem["requires"].get("inventory") or {}).get("player_idle_time")
+            if idle_time is not None and (not isinstance(idle_time, (int, float)) or isinstance(idle_time, bool) or idle_time < 0):
+                raise ValueError("player_idle_time musi byc nieujemna liczba sekund.")
+
+    @staticmethod
     def parse(yaml_data):
         # Sprawdzenie metadanych w celu ustalenia wersji i typu scenariusza
         meta = yaml_data.get("meta", {})
@@ -153,6 +174,9 @@ class XSMLParser:
         if not scenario_actions:
             raise ValueError("Brak sekcji lub pusta sekcja 'actions' w scenariuszu.")
         XSMLParser.validate_actions(scenario_actions)
+
+        scenario_support = scenario_root.get("support") or {}
+        XSMLParser.validate_support(scenario_support)
     
         scenario = {
             "id": scenario_id,
@@ -161,7 +185,8 @@ class XSMLParser:
             "inventory": scenario_inventory,
             "worldstate": scenario_worldstate,
             "goals": XSMLParser.construct_goal_tree(scenario_goals),
-            "actions": scenario_actions
+            "actions": scenario_actions,
+            "support": scenario_support,
         }
 
         return SimulationScenario(scenario)

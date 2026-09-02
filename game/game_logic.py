@@ -1,5 +1,6 @@
 from parser.parser import SimulationScenario
 from typing import Dict
+from time import monotonic
 
 class SimulationAction:
     def __init__(self, id, description, command, simulated_output, requires, changes, available=False):
@@ -77,6 +78,14 @@ class SimulationGoal:
             return goals.values()
         raise ValueError("Podcele musza byc lista lub slownikiem celow.")
 
+
+class SimulationHint:
+    def __init__(self, hint_data: dict):
+        self.id: str = hint_data["id"]
+        self.hint: str = str(hint_data["hint"])
+        self.requires: dict = hint_data.get("requires") or {}
+        self.player_idle_time = self.requires.get("inventory", {}).get("player_idle_time")
+
 class GameLogic:
     def __init__(self, scenario: SimulationScenario):
         self.scenario = scenario
@@ -100,6 +109,11 @@ class GameLogic:
             )
             for action_data in self._iter_action_data(scenario.actions)
         }
+        self.hints: Dict[str, SimulationHint] = {
+            hint.id: hint
+            for hint in (SimulationHint(hint_data) for hint_data in scenario.support.get("problems", []))
+        }
+        self.last_action_time = monotonic()
 
         self.update_goal_progress()
 
@@ -126,12 +140,22 @@ class GameLogic:
 
     def are_requirements_fullfilled(self, requirements: dict) -> bool:
         for requirement, value in requirements["inventory"].items():
+            if requirement == "player_idle_time":
+                continue
             if self.scenario.get_inventory_variable(requirement) != value:
                 return False
         for requirement, value in requirements["worldstate"].items():
             if self.scenario.get_worldstate_variable(requirement) != value:
                 return False
         return True
+
+    def get_available_hints(self, now=None) -> list[SimulationHint]:
+        elapsed_time = (monotonic() if now is None else now) - self.last_action_time
+        return [
+            hint for hint in self.hints.values()
+            if self.are_requirements_fullfilled(hint.requires)
+            and (hint.player_idle_time is None or elapsed_time >= hint.player_idle_time)
+        ]
 
     def execute_action(self, action_id: str) -> SimulationAction:
         action = self.actions.get(action_id)
@@ -149,6 +173,8 @@ class GameLogic:
         for variable_name, value in action.inventory_and_worldstate_changes.items():
             self.scenario.set_inventory_variable(variable_name, value)
             self.scenario.set_worldstate_variable(variable_name, value)
+
+        self.last_action_time = monotonic()
 
         return action
 

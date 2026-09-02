@@ -52,6 +52,15 @@ def serialize_state(game_logic: GameLogic) -> dict:
     }
 
 
+def serialize_hints(game_logic: GameLogic) -> dict:
+    return {
+        "hints": [
+            {"id": hint.id, "hint": hint.hint}
+            for hint in game_logic.get_available_hints()
+        ],
+    }
+
+
 def create_app() -> Tuple[Flask, SocketIO]:
     app = Flask(__name__, static_folder='game/html/dist', static_url_path='')
     socketio = SocketIO(app)
@@ -100,6 +109,7 @@ def create_app() -> Tuple[Flask, SocketIO]:
 
         sid_to_key[request.sid] = key
         emit('state', serialize_state(game_logic))
+        emit('hints', serialize_hints(game_logic))
 
     @socketio.on('disconnect', namespace='/ws/game')
     def handle_disconnect():
@@ -126,6 +136,14 @@ def create_app() -> Tuple[Flask, SocketIO]:
             "simulated_output": action.simulated_output,
         })
         emit('state', serialize_state(game_logic))
+        emit('hints', serialize_hints(game_logic))
+
+    @socketio.on('hints_request', namespace='/ws/game')
+    def handle_hints_request():
+        key = sid_to_key.get(request.sid)
+        game_logic = player_sessions.get(key) if key else None
+        if game_logic is not None:
+            emit('hints', serialize_hints(game_logic))
 
     return app, socketio
 
