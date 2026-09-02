@@ -5,7 +5,7 @@ scenario:
   id: hardening_linux
   title: "Zidentyfikowanie potencjalnych luk bezpieczeństwa w systemie Linux"
   description: "Celem misji jest określenie jakie elementy funkcjonują w systemie i jak można je uszczelnić"
-  environment:
+  worldstate:
     firewall_enabled: false
   inventory:
 
@@ -13,84 +13,126 @@ scenario:
     - id: "complete_hardening_of_linux_system"
       description: "Zlokalizowano i utwardzono wszystkie dziury bezpieczeństwa systemu"
       requires:
+        inventory: {}
+        worldstate: {}
       subgoals:
         - id: "set_strong_root_password"
           description: "Ustalono silne hasło dla użytkownika root"
           requires:
-            changed_root_password: true
+            inventory:
+              changed_root_password: true
+            worldstate: {}
           subgoals:
             - id: "identify_weak_root_password"
               description: "Zidentyfikowano słabe hasło użytkownika"
               requires:
-                weak_user_password_detected: true
+                inventory:
+                  weak_user_password_detected: true
+                worldstate: {}
 
         - id: "enable_firewall"
           description: "Usługa zapory sieciowej została uruchomiona"
           requires:
-            firewall_enabled: true
+            inventory: {}
+            worldstate:
+              firewall_enabled: true
           subgoals:
             - id: "firewall_disabled_detected"
               description: "Ustalono, że usługa zapory sieciowej nie jest aktywna"
               requires:
-                firewall_disabled_detected: true
+                inventory:
+                  firewall_status_checked: true
+                worldstate: {}
 
   actions:
     - id: "check_user_password"
       description: "Sprawdź, czy użytkownik root ma słabe hasło"
       command: "echo /root/root_password.txt"
       requires:
+        inventory: {}
+        worldstate: {}
       produces:
         - id: "weak_user_password_detected"
           probability: 1.0
           inventory_change:
-            weak_user_password_detected: true
+            change:
+              inventory:
+                weak_user_password_detected: true
+              worldstate: {}
+              inventory_and_worldstate: {}
           simulated_output: |
             root
     - id: "set_strong_root_password"
       description: "Ustal silne hasło dla użytkownika root"
       command: "pwgen -s 8 | tee /dev/tty | passwd -s root"
       requires:
-        weak_user_password_detected: true
+        inventory:
+          weak_user_password_detected: true
+        worldstate: {}
       produces:
         - id: "changed_password_to_strong_generated_one"
           probability: 1.0
           inventory_change:
-            changed_root_password: true
+            change:
+              inventory: {}
+              worldstate: {}
+              inventory_and_worldstate:
+                changed_root_password: true
           simulated_output: |
             pnFBg9jB8AlKL3fe
     - id: "check_firewall_status"
       description: "Sprawdź stan zapory sieciowej"
       command: "systemctl status firewalld.service"
       requires:
+        inventory: {}
+        worldstate: {}
       produces:
         - id: "firewall_status_checked"
           probability: 1.0
           inventory_change:
-            firewall_enabled: false
-            firewall_status_checked: true
+            change:
+              inventory: {}
+              worldstate: {}
+              inventory_and_worldstate:
+                firewall_status_checked: true
           simulated_output: |
             <Firewall status placeholder>
     - id: "enable_firewall"
       description: "Uruchom usługę zapory sieciowej"
       command: "systemctl enable firewalld.service --now"
       requires:
-        firewall_status_checked: true
-        firewall_enabled: false
+        inventory:
+          firewall_status_checked: true
+        worldstate:
+          firewall_enabled: false
       produces:
         - id: "firewall_enabled"
           probability: 1.0
           inventory_change:
-            firewall_enabled: true
+            change:
+              inventory: {}
+              worldstate: {}
+              inventory_and_worldstate:
+                firewall_enabled: true
           simulated_output: |
             <Firewall enabled output placeholder>
   support:
-    issues:
-      - initial_step:
-          hint: "Sprawdź dostępne akcje"
+    problems:
+      - getting_started_1:
+          hint: "Sprawdź dostępne akcje, może warto sprawdzić hasło użytkownika root?"
+          # Przenieść idle_time do osobnej części, wskazówka tylko jak gracz o nią poprosi, pod warunkiem że spełnił warunki do jej udzielenia
+          idle_time_before_support: 15
           requires:
-            idle_time: 15
-            performance: "begineer" # Po co to?
-            firewall_status_checked: false
-            weak_user_password_detected: true
+            inventory:
+              weak_user_password_detected: false
+            worldstate: {}
+      - getting_started_2:
+          hint: "Sprawdź dostępne akcje, może warto sprawdzić stan zapory sieciowej?"
+          # Przenieść idle_time do osobnej części, wskazówka tylko jak gracz o nią poprosi, pod warunkiem że spełnił warunki do jej udzielenia
+          idle_time_before_support: 15
+          requires:
+            inventory:
+              firewall_status_checked: false
+            worldstate: {}
 
 

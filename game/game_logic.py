@@ -2,13 +2,14 @@ from parser.parser import SimulationScenario
 from typing import Dict
 
 class SimulationAction:
-    def __init__(self, id, description, command, simulated_output, requires, inventory_changes, environment_changes, available=False):
+    def __init__(self, id, description, command, simulated_output, requires, changes, available=False):
         self.description: str = description
         self.command: str = command
         self.simulated_output: str = simulated_output
         self.requires: dict = requires
-        self.inventory_changes: dict = inventory_changes
-        self.environment_changes: dict = environment_changes
+        self.inventory_changes: dict = changes["inventory"]
+        self.worldstate_changes: dict = changes["worldstate"]
+        self.inventory_and_worldstate_changes: dict = changes["inventory_and_worldstate"]
         self.available: bool = available
 
     @staticmethod
@@ -16,9 +17,7 @@ class SimulationAction:
         for produced in action_data.get("produces") or []:
             if not isinstance(produced, dict):
                 continue
-            # Produced entries can be flat (id/probability/inventory_change/...) or wrapped
-            # in a single key naming the produced fact, e.g. {"fact_name": {inventory_change: ...}}.
-            if "inventory_change" in produced or "environment_change" in produced or "simulated_output" in produced:
+            if "inventory_change" in produced or "simulated_output" in produced:
                 yield produced
             else:
                 for value in produced.values():
@@ -40,10 +39,17 @@ class SimulationAction:
         raise ValueError("inventory_change/environment_change musi byc slownikiem lub lista.")
 
     @classmethod
-    def _collect_changes(cls, action_data: dict, key: str) -> dict:
-        changes: dict = {}
+    def _collect_changes(cls, action_data: dict) -> dict:
+        changes = {
+            "inventory": {},
+            "worldstate": {},
+            "inventory_and_worldstate": {},
+        }
         for entry in cls._iter_produced_entries(action_data):
-            changes.update(cls._merge_change_map(entry.get(key)))
+            inventory_change = entry.get("inventory_change") or {}
+            change = inventory_change.get("change") or {}
+            for scope in changes:
+                changes[scope].update(cls._merge_change_map(change.get(scope)))
         return changes
 
 
@@ -89,8 +95,7 @@ class GameLogic:
                 command=action_data.get("command", ""),
                 simulated_output=self._get_simulated_output(action_data),
                 requires=action_data.get("requires") or {},
-                inventory_changes=SimulationAction._collect_changes(action_data, "inventory_change"),
-                environment_changes=SimulationAction._collect_changes(action_data, "environment_change"),
+                changes=SimulationAction._collect_changes(action_data),
                 available=self.are_requirements_fullfilled(action_data.get("requires") or {})
             )
             for action_data in self._iter_action_data(scenario.actions)
@@ -120,8 +125,11 @@ class GameLogic:
         return ""
 
     def are_requirements_fullfilled(self, requirements: dict) -> bool:
-        for requirement, value in requirements.items():
-            if self.scenario.get_simulation_variable(requirement) != value:
+        for requirement, value in requirements["inventory"].items():
+            if self.scenario.get_inventory_variable(requirement) != value:
+                return False
+        for requirement, value in requirements["worldstate"].items():
+            if self.scenario.get_worldstate_variable(requirement) != value:
                 return False
         return True
 
@@ -136,8 +144,11 @@ class GameLogic:
         # aktualizuje dostepnosc akcji oraz postep celow.
         for variable_name, value in action.inventory_changes.items():
             self.scenario.set_inventory_variable(variable_name, value)
-        for variable_name, value in action.environment_changes.items():
-            self.scenario.set_environment_variable(variable_name, value)
+        for variable_name, value in action.worldstate_changes.items():
+            self.scenario.set_worldstate_variable(variable_name, value)
+        for variable_name, value in action.inventory_and_worldstate_changes.items():
+            self.scenario.set_inventory_variable(variable_name, value)
+            self.scenario.set_worldstate_variable(variable_name, value)
 
         return action
 
