@@ -132,7 +132,7 @@ def create_app() -> Tuple[Flask, SocketIO]:
             return
 
         emit('terminal_output', {
-            "command": action.command,
+            "user_input": action.user_input,
             "simulated_output": action.simulated_output,
         })
         emit('state', serialize_state(game_logic))

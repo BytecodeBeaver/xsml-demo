@@ -47,7 +47,7 @@ scenario:
   actions:
     - id: "check_user_password"
       description: "Sprawdź hasło użytkownika root"
-      command: "echo /root/root_password.txt"
+      user_input: "echo /root/root_password.txt"
       requires:
         inventory: {}
         worldstate: {}
@@ -64,7 +64,7 @@ scenario:
             root
     - id: "set_strong_root_password"
       description: "Wygeneruj nowe, silne hasło dla użytkownika root"
-      command: "pwgen -s 8 | tee /dev/tty | passwd -s root"
+      user_input: "pwgen -s 8 | tee /dev/tty | passwd -s root"
       requires:
         inventory:
           weak_user_password_detected: true
@@ -82,7 +82,7 @@ scenario:
             pnFBg9jB8AlKL3fe
     - id: "check_firewall_status"
       description: "Sprawdź stan zapory sieciowej"
-      command: "systemctl status firewalld.service"
+      user_input: "systemctl status firewalld.service"
       requires:
         inventory: {}
         worldstate: {}
@@ -96,10 +96,19 @@ scenario:
               inventory_and_worldstate:
                 firewall_status_checked: true
           simulated_output: |
-            <Firewall status placeholder>
+            ○ firewalld.service - firewalld - dynamic firewall daemon
+            Loaded: loaded (/usr/lib/systemd/system/firewalld.service; disabled; preset: enabled)
+            Active: inactive (dead)
+              Docs: man:firewalld(1)
+
+            sie 27 15:13:30 debian systemd[1]: Starting firewalld.service - firewalld - dynamic firewall daemon...
+            sie 27 15:13:31 debian systemd[1]: Started firewalld.service - firewalld - dynamic firewall daemon.
+            sie 27 15:13:53 debian systemd[1]: Stopping firewalld.service - firewalld - dynamic firewall daemon...
+            sie 27 15:13:53 debian systemd[1]: firewalld.service: Deactivated successfully.
+            sie 27 15:13:53 debian systemd[1]: Stopped firewalld.service - firewalld - dynamic firewall daemon.
     - id: "enable_firewall"
       description: "Uruchom usługę zapory sieciowej"
-      command: "systemctl enable firewalld.service --now"
+      user_input: "systemctl enable firewalld.service --now"
       requires:
         inventory:
           firewall_status_checked: true
@@ -115,7 +124,7 @@ scenario:
               inventory_and_worldstate:
                 firewall_enabled: true
           simulated_output: |
-            <Firewall enabled output placeholder>
+            Created symlink /etc/systemd/system/multi-user.target.wants/firewalld.service → /lib/systemd/system/firewalld.service.
   support:
     problems:
       - id: "getting_started_1"

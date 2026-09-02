@@ -225,12 +225,12 @@ function connectToGameServer(scenarioId: string, nickname: string): void {
     terminal?.writeln(`Polaczono z serwerem gry (scenariusz: ${scenarioId})`);
   });
 
-  socket.on('terminal_output', (payload: { command: string; simulated_output: string }) => {
+  socket.on('terminal_output', (payload: { user_input: string; simulated_output: string }) => {
     if (!terminal) {
       return;
     }
 
-    terminal.write(`${payload.command}\r\n`);
+    terminal.write(`${payload.user_input}\r\n`);
     if (payload.simulated_output) {
       terminal.write(payload.simulated_output.replace(/\n/g, '\r\n'));
     }

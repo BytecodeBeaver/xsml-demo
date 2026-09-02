@@ -3,9 +3,9 @@ from typing import Dict
 from time import monotonic
 
 class SimulationAction:
-    def __init__(self, id, description, command, simulated_output, requires, changes, available=False):
+    def __init__(self, id, description, user_input, simulated_output, requires, changes, available=False):
         self.description: str = description
-        self.command: str = command
+        self.user_input: str = user_input
         self.simulated_output: str = simulated_output
         self.requires: dict = requires
         self.inventory_changes: dict = changes["inventory"]
@@ -101,7 +101,7 @@ class GameLogic:
             action_data["id"]: SimulationAction(
                 id=action_data["id"],
                 description=action_data.get("description"),
-                command=action_data.get("command", ""),
+                user_input=action_data.get("user_input", ""),
                 simulated_output=self._get_simulated_output(action_data),
                 requires=action_data.get("requires") or {},
                 changes=SimulationAction._collect_changes(action_data),
