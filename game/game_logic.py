@@ -142,10 +142,16 @@ class GameLogic:
         for requirement, value in requirements["inventory"].items():
             if requirement == "player_idle_time":
                 continue
-            if self.scenario.get_inventory_variable(requirement) != value:
+            actual_value = self.scenario.get_inventory_variable(requirement)
+            if actual_value is None and value is False:
+                continue
+            if actual_value != value:
                 return False
         for requirement, value in requirements["worldstate"].items():
-            if self.scenario.get_worldstate_variable(requirement) != value:
+            actual_value = self.scenario.get_worldstate_variable(requirement)
+            if actual_value is None and value is False:
+                continue
+            if actual_value != value:
                 return False
         return True
 

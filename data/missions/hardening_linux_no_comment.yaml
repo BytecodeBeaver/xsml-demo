@@ -118,21 +118,33 @@ scenario:
             <Firewall enabled output placeholder>
   support:
     problems:
-      - getting_started_1:
-          hint: "Sprawdź dostępne akcje, może warto sprawdzić hasło użytkownika root?"
-          # Przenieść idle_time do osobnej części, wskazówka tylko jak gracz o nią poprosi, pod warunkiem że spełnił warunki do jej udzielenia
-          idle_time_before_support: 15
-          requires:
-            inventory:
-              weak_user_password_detected: false
-            worldstate: {}
-      - getting_started_2:
-          hint: "Sprawdź dostępne akcje, może warto sprawdzić stan zapory sieciowej?"
-          # Przenieść idle_time do osobnej części, wskazówka tylko jak gracz o nią poprosi, pod warunkiem że spełnił warunki do jej udzielenia
-          idle_time_before_support: 15
-          requires:
-            inventory:
-              firewall_status_checked: false
-            worldstate: {}
-
+      - id: "getting_started_1"
+        hint: "Sprawdź dostępne akcje, może warto sprawdzić hasło użytkownika root?"
+        requires:
+          inventory:
+            player_idle_time: 15
+            weak_user_password_detected: false
+          worldstate: {}
+      - id: "getting_started_2" 
+        hint: "Sprawdź dostępne akcje, może warto sprawdzić stan zapory sieciowej?"
+        requires:
+          inventory:
+            player_idle_time: 15
+            firewall_status_checked: false
+          worldstate: {}
+      - id: "suggest_password_change"
+        hint: "Hasło użytkownika root jest słabe, co możesz teraz zrobić?"
+        requires:
+          inventory:
+            player_idle_time: 15
+            weak_user_password_detected: true
+          worldstate: {}
+      - id: "suggest_firewall_enable"
+        hint: "Zapora sieciowa nie jest aktywna, co możesz teraz zrobić?"
+        requires:
+          inventory:
+            player_idle_time: 15
+            firewall_status_checked: true
+          worldstate:
+            firewall_enabled: false
 
