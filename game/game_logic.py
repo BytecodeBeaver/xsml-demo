@@ -111,7 +111,7 @@ class GameLogic:
         }
         self.hints: Dict[str, SimulationHint] = {
             hint.id: hint
-            for hint in (SimulationHint(hint_data) for hint_data in scenario.support.get("problems", []))
+            for hint in (SimulationHint(hint_data) for hint_data in scenario.support)
         }
         self.last_action_time = monotonic()
 

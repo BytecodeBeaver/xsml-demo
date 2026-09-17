@@ -7,7 +7,7 @@ class SimulationScenario:
         self.worldstate: dict = scenario_data.get("worldstate") or {}
         self.goals: dict = scenario_data.get("goals")
         self.actions: dict = scenario_data.get("actions")
-        self.support: dict = scenario_data.get("support") or {}
+        self.support: list = scenario_data.get("support") or []
 
         # Observer
         self._listeners = []
@@ -117,14 +117,10 @@ class XSMLParser:
     def validate_support(support):
         if support is None:
             return
-        if not isinstance(support, dict):
-            raise ValueError("Sekcja 'support' musi byc slownikiem.")
+        if not isinstance(support, list):
+            raise ValueError("Sekcja 'support' musi byc lista.")
 
-        problems = support.get("problems", [])
-        if not isinstance(problems, list):
-            raise ValueError("Sekcja 'support.problems' musi byc lista.")
-
-        for problem in problems:
+        for problem in support:
             if not isinstance(problem, dict) or not problem.get("id") or "hint" not in problem:
                 raise ValueError("Kazda podpowiedz musi zawierac 'id' i 'hint'.")
             XSMLParser.validate_requires(problem.get("requires"), problem["id"])
@@ -142,21 +138,21 @@ class XSMLParser:
         if meta.get("version") != "0.1": # TODO: W przyszłości obsłużyć różne wersje scenariuszy
             raise ValueError("Nieprawidłowa wersja scenariusza. Parser wspiera tylko wersję '0.1'.")
 
-        scenario_root = yaml_data.get("scenario", {})
+        scenario_root = yaml_data.get("mission", {})
         if not scenario_root:
-            raise ValueError("Brak sekcji 'scenario' w scenariuszu.")
+            raise ValueError("Brak sekcji 'mission' w scenariuszu.")
 
         scenario_id = scenario_root.get("id")
         if not scenario_id:
-            raise ValueError("Brak identyfikatora scenariusza w sekcji 'scenario'.")
+            raise ValueError("Brak identyfikatora scenariusza w sekcji 'mission'.")
 
         scenario_title = scenario_root.get("title")
         if not scenario_title:
-            raise ValueError("Niezdefiniowano tytułu scenariusza w sekcji 'scenario'.")
+            raise ValueError("Niezdefiniowano tytułu scenariusza w sekcji 'mission'.")
 
         scenario_description = scenario_root.get("description")
         if not scenario_description:
-            raise ValueError("Niezdefiniowano opisu scenariusza w sekcji 'scenario'.")
+            raise ValueError("Niezdefiniowano opisu scenariusza w sekcji 'mission'.")
 
         if "inventory" not in scenario_root:
             raise ValueError("Brak sekcji 'inventory' w scenariuszu.")
@@ -175,7 +171,7 @@ class XSMLParser:
             raise ValueError("Brak sekcji lub pusta sekcja 'actions' w scenariuszu.")
         XSMLParser.validate_actions(scenario_actions)
 
-        scenario_support = scenario_root.get("support") or {}
+        scenario_support = scenario_root.get("support") or []
         XSMLParser.validate_support(scenario_support)
     
         scenario = {
