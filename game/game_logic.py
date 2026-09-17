@@ -18,7 +18,7 @@ class SimulationAction:
         for produced in action_data.get("produces") or []:
             if not isinstance(produced, dict):
                 continue
-            if "inventory_change" in produced or "simulated_output" in produced:
+            if "change" in produced or "simulated_output" in produced:
                 yield produced
             else:
                 for value in produced.values():
@@ -47,8 +47,7 @@ class SimulationAction:
             "inventory_and_worldstate": {},
         }
         for entry in cls._iter_produced_entries(action_data):
-            inventory_change = entry.get("inventory_change") or {}
-            change = inventory_change.get("change") or {}
+            change = entry.get("change") or {}
             for scope in changes:
                 changes[scope].update(cls._merge_change_map(change.get(scope)))
         return changes

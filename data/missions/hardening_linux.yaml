@@ -1,13 +1,13 @@
 meta:
-  dialect: "xsml"
-  version: "0.1"
+  type: "xsml"
+  version: "0.1.0"
 mission:
   id: hardening_linux
   title: "Zidentyfikowanie potencjalnych luk bezpieczeństwa w systemie Linux"
   description: "Celem misji jest określenie jakie elementy funkcjonują w systemie i jak można je uszczelnić"
   worldstate:
     firewall_enabled: false
-  inventory:
+  inventory: {}
 
   goals:
     - id: "complete_hardening_of_linux_system"
@@ -54,12 +54,11 @@ mission:
       produces:
         - id: "weak_user_password_detected"
           probability: 1.0
-          inventory_change:
-            change:
-              inventory:
-                weak_user_password_detected: true
-              worldstate: {}
-              inventory_and_worldstate: {}
+          change:
+            inventory:
+              weak_user_password_detected: true
+            worldstate: {}
+            inventory_and_worldstate: {}
           simulated_output: |
             root
     - id: "set_strong_root_password"
@@ -72,12 +71,11 @@ mission:
       produces:
         - id: "changed_password_to_strong_generated_one"
           probability: 1.0
-          inventory_change:
-            change:
-              inventory: {}
-              worldstate: {}
-              inventory_and_worldstate:
-                changed_root_password: true
+          change:
+            inventory: {}
+            worldstate: {}
+            inventory_and_worldstate:
+              changed_root_password: true
           simulated_output: |
             pnFBg9jB8AlKL3fe
     - id: "check_firewall_status"
@@ -89,12 +87,11 @@ mission:
       produces:
         - id: "firewall_status_checked"
           probability: 1.0
-          inventory_change:
-            change:
-              inventory: {}
-              worldstate: {}
-              inventory_and_worldstate:
-                firewall_status_checked: true
+          change:
+            inventory: {}
+            worldstate: {}
+            inventory_and_worldstate:
+              firewall_status_checked: true
           simulated_output: |
             ○ firewalld.service - firewalld - dynamic firewall daemon
             Loaded: loaded (/usr/lib/systemd/system/firewalld.service; disabled; preset: enabled)
@@ -117,12 +114,11 @@ mission:
       produces:
         - id: "firewall_enabled"
           probability: 1.0
-          inventory_change:
-            change:
-              inventory: {}
-              worldstate: {}
-              inventory_and_worldstate:
-                firewall_enabled: true
+          change:
+            inventory: {}
+            worldstate: {}
+            inventory_and_worldstate:
+              firewall_enabled: true
           simulated_output: |
             Created symlink /etc/systemd/system/multi-user.target.wants/firewalld.service → /lib/systemd/system/firewalld.service.
   support:
@@ -156,4 +152,30 @@ mission:
           firewall_status_checked: true
         worldstate:
           firewall_enabled: false
+  scenarios:
+    - id: "linux_hardening_walkthrough"
+      goal: "complete_hardening_of_linux_system"
+      nodes:
+        start:
+          id: "start"
+          description: "Rozpoczęto analizę bezpieczeństwa systemu Linux"
+        password_checked:
+          id: "password_checked"
+          description: "Sprawdzono hasło użytkownika root"
+        firewall_checked:
+          id: "firewall_checked"
+          description: "Sprawdzono stan zapory sieciowej"
+        completed:
+          id: "completed"
+          description: "Zakończono utwardzanie systemu Linux"
+      transitions:
+        - from: "start"
+          to: "password_checked"
+          action_trigger: "check_user_password"
+        - from: "password_checked"
+          to: "firewall_checked"
+          action_trigger: "check_firewall_status"
+        - from: "firewall_checked"
+          to: "completed"
+          action_trigger: "enable_firewall"
 
