@@ -1,0 +1,232 @@
+meta:
+  type: "xsml"
+  version: "0.1.0"
+mission:
+  id: nmap_reconnaissance
+  title: "Rekonesans z użyciem nmap"
+  description: "Celem misji jest rozpoznanie hosta i dostępnych na nim usług sieciowych"
+  worldstate:
+    target_reachable: false
+    services_identified: false
+  inventory: {}
+
+  goals:
+    - id: "complete_nmap_reconnaissance"
+      description: "Zakończono rekonesans wskazanego hosta"
+      requires:
+        inventory: {}
+        worldstate:
+          services_identified: true
+      subgoals:
+        - id: "discover_target_host"
+          description: "Potwierdzono dostępność hosta docelowego"
+          requires:
+            inventory:
+              target_discovered: true
+            worldstate: {}
+        - id: "scan_target_ports"
+          description: "Przeskanowano porty hosta docelowego"
+          requires:
+            inventory:
+              ports_scanned: true
+            worldstate: {}
+        - id: "identify_target_services"
+          description: "Zidentyfikowano usługi działające na otwartych portach"
+          requires:
+            inventory:
+              service_detection_completed: true
+            worldstate: {}
+
+  actions:
+    - id: "discover_target"
+      description: "Sprawdź, czy host docelowy odpowiada"
+      user_input: "nmap -sn 192.168.1.10"
+      requires:
+        inventory: {}
+        worldstate: {}
+      produces:
+        - id: "target_discovered"
+          probability: 1.0
+          change:
+            inventory:
+              target_discovered: true
+            worldstate:
+              target_reachable: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            Nmap scan report for 192.168.1.10
+            Host is up (0.012s latency).
+
+    - id: "discover_target_with_arp"
+      description: "Wykryj hosta docelowego za pomocą zapytania ARP"
+      user_input: "nmap -PR -sn 192.168.1.10"
+      requires:
+        inventory: {}
+        worldstate: {}
+      produces:
+        - id: "target_discovered_by_arp"
+          probability: 1.0
+          change:
+            inventory:
+              target_discovered: true
+            worldstate:
+              target_reachable: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            Nmap scan report for 192.168.1.10
+            Host is up (0.0041s latency).
+            MAC Address: 00:11:22:33:44:55 (Example Vendor)
+
+    - id: "scan_target_ports"
+      description: "Przeskanuj porty hosta docelowego"
+      user_input: "nmap -p- 192.168.1.10"
+      requires:
+        inventory:
+          target_discovered: true
+        worldstate:
+          target_reachable: true
+      produces:
+        - id: "ports_scanned"
+          probability: 1.0
+          change:
+            inventory:
+              ports_scanned: true
+            worldstate: {}
+            inventory_and_worldstate: {}
+          simulated_output: |
+            PORT     STATE SERVICE
+            22/tcp   open  ssh
+            80/tcp   open  http
+            443/tcp  open  https
+
+    - id: "scan_common_ports"
+      description: "Przeskanuj najczęściej używane porty hosta"
+      user_input: "nmap --top-ports 100 192.168.1.10"
+      requires:
+        inventory:
+          target_discovered: true
+        worldstate:
+          target_reachable: true
+      produces:
+        - id: "common_ports_scanned"
+          probability: 1.0
+          change:
+            inventory:
+              ports_scanned: true
+            worldstate: {}
+            inventory_and_worldstate: {}
+          simulated_output: |
+            PORT    STATE SERVICE
+            22/tcp  open  ssh
+            80/tcp  open  http
+            443/tcp open  https
+
+    - id: "identify_target_services"
+      description: "Określ wersje usług działających na otwartych portach"
+      user_input: "nmap -sV 192.168.1.10"
+      requires:
+        inventory:
+          ports_scanned: true
+        worldstate:
+          target_reachable: true
+      produces:
+        - id: "service_detection_completed"
+          probability: 1.0
+          change:
+            inventory:
+              service_detection_completed: true
+            worldstate:
+              services_identified: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            PORT    STATE SERVICE VERSION
+            22/tcp  open  ssh     OpenSSH 9.2p1
+            80/tcp  open  http    nginx 1.22.1
+            443/tcp open  https   nginx 1.22.1
+
+    - id: "identify_services_aggressively"
+      description: "Zidentyfikuj usługi z użyciem rozszerzonego skanowania"
+      user_input: "nmap -A --version-light 192.168.1.10"
+      requires:
+        inventory:
+          ports_scanned: true
+        worldstate:
+          target_reachable: true
+      produces:
+        - id: "aggressive_service_detection_completed"
+          probability: 1.0
+          change:
+            inventory:
+              service_detection_completed: true
+            worldstate:
+              services_identified: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            PORT    STATE SERVICE VERSION
+            22/tcp  open  ssh     OpenSSH 9.2p1
+            80/tcp  open  http    nginx 1.22.1
+            443/tcp open  https   nginx 1.22.1
+            OS details: Linux 5.x
+
+  support:
+    - id: "suggest_target_discovery"
+      hint: "Rozpocznij od sprawdzenia, czy host docelowy jest dostępny."
+      requires:
+        inventory:
+          player_idle_time: 15
+          target_discovered: false
+        worldstate: {}
+    - id: "suggest_port_scan"
+      hint: "Host odpowiada. Wykonaj skan wszystkich portów."
+      requires:
+        inventory:
+          player_idle_time: 15
+          target_discovered: true
+          ports_scanned: false
+        worldstate:
+          target_reachable: true
+    - id: "suggest_service_detection"
+      hint: "Porty zostały znalezione. Sprawdź wersje dostępnych usług."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ports_scanned: true
+          service_detection_completed: false
+        worldstate:
+          target_reachable: true
+
+  scenarios:
+    - id: "nmap_reconnaissance_walkthrough"
+      goal: "complete_nmap_reconnaissance"
+      nodes:
+        start:
+          id: "start"
+          description: "Rozpoczęto rekonesans hosta"
+        target_discovered:
+          id: "target_discovered"
+          description: "Potwierdzono dostępność hosta"
+        ports_scanned:
+          id: "ports_scanned"
+          description: "Przeskanowano porty hosta"
+        completed:
+          id: "completed"
+          description: "Zidentyfikowano usługi na hoście"
+      transitions:
+        - from: "start"
+          to: "target_discovered"
+          action_trigger: "discover_target"
+        - from: "start"
+          to: "target_discovered"
+          action_trigger: "discover_target_with_arp"
+        - from: "target_discovered"
+          to: "ports_scanned"
+          action_trigger: "scan_target_ports"
+        - from: "target_discovered"
+          to: "ports_scanned"
+          action_trigger: "scan_common_ports"
+        - from: "ports_scanned"
+          to: "completed"
+          action_trigger: "identify_target_services"
+        - from: "ports_scanned"
+          to: "completed"
+          action_trigger: "identify_services_aggressively"

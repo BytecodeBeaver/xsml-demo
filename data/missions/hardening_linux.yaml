@@ -162,6 +162,9 @@ mission:
         password_checked:
           id: "password_checked"
           description: "Sprawdzono hasło użytkownika root"
+        password_hardened:
+          id: "password_hardened"
+          description: "Ustawiono silne hasło użytkownika root"
         firewall_checked:
           id: "firewall_checked"
           description: "Sprawdzono stan zapory sieciowej"
@@ -173,6 +176,9 @@ mission:
           to: "password_checked"
           action_trigger: "check_user_password"
         - from: "password_checked"
+          to: "password_hardened"
+          action_trigger: "set_strong_root_password"
+        - from: "password_hardened"
           to: "firewall_checked"
           action_trigger: "check_firewall_status"
         - from: "firewall_checked"

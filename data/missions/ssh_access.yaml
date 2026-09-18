@@ -1,0 +1,214 @@
+meta:
+  type: "xsml"
+  version: "0.1.0"
+mission:
+  id: ssh_access
+  title: "Uzyskanie dostępu przez SSH"
+  description: "Celem misji jest nawiązanie bezpiecznego połączenia z serwerem SSH"
+  worldstate:
+    ssh_service_available: false
+    ssh_access_established: false
+  inventory: {}
+
+  goals:
+    - id: "establish_ssh_access"
+      description: "Nawiązano bezpieczny dostęp do serwera przez SSH"
+      requires:
+        inventory: {}
+        worldstate:
+          ssh_access_established: true
+      subgoals:
+        - id: "identify_ssh_service"
+          description: "Ustalono, że usługa SSH jest dostępna"
+          requires:
+            inventory:
+              ssh_service_checked: true
+            worldstate: {}
+        - id: "authenticate_ssh_user"
+          description: "Poprawnie uwierzytelniono użytkownika przez SSH"
+          requires:
+            inventory:
+              ssh_credentials_verified: true
+            worldstate: {}
+
+  actions:
+    - id: "check_ssh_service"
+      description: "Sprawdź dostępność usługi SSH"
+      user_input: "systemctl status ssh.service"
+      requires:
+        inventory: {}
+        worldstate: {}
+      produces:
+        - id: "ssh_service_checked"
+          probability: 1.0
+          change:
+            inventory:
+              ssh_service_checked: true
+            worldstate:
+              ssh_service_available: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            ● ssh.service - OpenBSD Secure Shell server
+              Loaded: loaded (/lib/systemd/system/ssh.service; enabled)
+              Active: active (running)
+
+    - id: "probe_ssh_port"
+      description: "Sprawdź, czy port SSH jest dostępny sieciowo"
+      user_input: "nc -vz server.local 22"
+      requires:
+        inventory: {}
+        worldstate: {}
+      produces:
+        - id: "ssh_port_detected"
+          probability: 1.0
+          change:
+            inventory:
+              ssh_service_checked: true
+            worldstate:
+              ssh_service_available: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            Connection to server.local 22 port [tcp/ssh] succeeded!
+
+    - id: "verify_ssh_credentials"
+      description: "Zweryfikuj dane uwierzytelniające użytkownika SSH"
+      user_input: "ssh -v analyst@server.local"
+      requires:
+        inventory:
+          ssh_service_checked: true
+        worldstate:
+          ssh_service_available: true
+      produces:
+        - id: "ssh_credentials_verified"
+          probability: 1.0
+          change:
+            inventory:
+              ssh_credentials_verified: true
+            worldstate: {}
+            inventory_and_worldstate: {}
+          simulated_output: |
+            OpenSSH connection established.
+            Authenticated to server.local using public key.
+
+    - id: "verify_ssh_key"
+      description: "Zweryfikuj klucz publiczny użytkownika SSH"
+      user_input: "ssh-keygen -lf ~/.ssh/id_ed25519.pub && ssh -o BatchMode=yes analyst@server.local true"
+      requires:
+        inventory:
+          ssh_service_checked: true
+        worldstate:
+          ssh_service_available: true
+      produces:
+        - id: "ssh_key_verified"
+          probability: 1.0
+          change:
+            inventory:
+              ssh_credentials_verified: true
+            worldstate: {}
+            inventory_and_worldstate: {}
+          simulated_output: |
+            256 SHA256:example analyst@client (ED25519)
+            SSH key authentication succeeded.
+
+    - id: "establish_ssh_connection"
+      description: "Nawiąż sesję SSH z serwerem"
+      user_input: "ssh analyst@server.local"
+      requires:
+        inventory:
+          ssh_credentials_verified: true
+        worldstate:
+          ssh_service_available: true
+      produces:
+        - id: "ssh_access_established"
+          probability: 1.0
+          change:
+            inventory: {}
+            worldstate:
+              ssh_access_established: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            Welcome to the secured Linux server.
+            analyst@server:~$
+
+    - id: "establish_ssh_tunnel"
+      description: "Uzyskaj dostęp przez tunel SSH"
+      user_input: "ssh -N -L 8080:localhost:80 analyst@server.local"
+      requires:
+        inventory:
+          ssh_credentials_verified: true
+        worldstate:
+          ssh_service_available: true
+      produces:
+        - id: "ssh_tunnel_established"
+          probability: 1.0
+          change:
+            inventory: {}
+            worldstate:
+              ssh_access_established: true
+            inventory_and_worldstate: {}
+          simulated_output: |
+            Local forwarding listening on 127.0.0.1:8080.
+            SSH tunnel established.
+
+  support:
+    - id: "suggest_ssh_service_check"
+      hint: "Najpierw sprawdź, czy usługa SSH jest uruchomiona."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_service_checked: false
+        worldstate: {}
+    - id: "suggest_ssh_credentials"
+      hint: "Usługa SSH jest dostępna. Spróbuj zweryfikować dane użytkownika."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_service_checked: true
+          ssh_credentials_verified: false
+        worldstate:
+          ssh_service_available: true
+    - id: "suggest_ssh_connection"
+      hint: "Dane uwierzytelniające są poprawne. Nawiąż sesję SSH."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_credentials_verified: true
+        worldstate:
+          ssh_service_available: true
+          ssh_access_established: false
+
+  scenarios:
+    - id: "ssh_access_walkthrough"
+      goal: "establish_ssh_access"
+      nodes:
+        start:
+          id: "start"
+          description: "Rozpoczęto próbę uzyskania dostępu przez SSH"
+        service_checked:
+          id: "service_checked"
+          description: "Sprawdzono dostępność usługi SSH"
+        credentials_verified:
+          id: "credentials_verified"
+          description: "Zweryfikowano dane uwierzytelniające"
+        completed:
+          id: "completed"
+          description: "Uzyskano dostęp przez SSH"
+      transitions:
+        - from: "start"
+          to: "service_checked"
+          action_trigger: "check_ssh_service"
+        - from: "start"
+          to: "service_checked"
+          action_trigger: "probe_ssh_port"
+        - from: "service_checked"
+          to: "credentials_verified"
+          action_trigger: "verify_ssh_credentials"
+        - from: "service_checked"
+          to: "credentials_verified"
+          action_trigger: "verify_ssh_key"
+        - from: "credentials_verified"
+          to: "completed"
+          action_trigger: "establish_ssh_connection"
+        - from: "credentials_verified"
+          to: "completed"
+          action_trigger: "establish_ssh_tunnel"
