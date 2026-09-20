@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T5
 Opis: Sprawdź czy akcja, której warunki są spełnione jest dostępna dla gracza.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Sprawdzenie akcji o pustych wymaganiach początkowych ('check_user_password', 'check_firewall_status') – powinny być dostępne od razu.
 3. Spełnienie warunków dla uprzednio niedostępnej akcji 'set_strong_root_password' poprzez wykonanie 'check_user_password'.
 4. Weryfikacja czy po zmianie stanu gry akcja 'set_strong_root_password' staje się dostępna (available == True).
@@ -30,7 +30,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT5AvailableActionRequirements(unittest.TestCase):

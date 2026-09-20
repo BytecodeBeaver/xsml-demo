@@ -1,12 +1,12 @@
 """
 Przypadek testowy: T2
 Opis: Sprawdź czy zmienna trafiająca do ekwipunku (inventory) jest dostępna z poziomu ekwipunku.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Dodanie zmiennej do ekwipunku gracza (np. 'weak_user_password_detected: true' poprzez set_inventory_variable lub wykonanie akcji 'check_user_password').
-3. Odczytanie zmiennej za pomocą metody get_inventory_variable oraz bezpośrednio ze słownika inventory.
+3. Odczytanie zmiennej za pomPocą metody get_inventory_variable oraz bezpośrednio ze słownika inventory.
 4. Weryfikacja czy zmienna ma poprawną wartość i jest dostępna w ekwipunku.
 
 Sukces:
@@ -30,7 +30,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT2InventoryVariableAccessibility(unittest.TestCase):

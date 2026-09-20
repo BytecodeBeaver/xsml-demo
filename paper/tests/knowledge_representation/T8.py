@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T8
 Opis: Cel główny powinien być uznany za nieosiągnięty, jeśli zarówno warunki osiągnięcia celu głównego jak i cele szczegółowe nie są osiągnięte.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Skonfigurowanie w celu głównym 'complete_hardening_of_linux_system' dodatkowego niespełnionego wymagania (np. requires: inventory: {'system_audit_approved': True}).
 3. Pozostawienie podcelów w stanie nieosiągniętym (brak wykonanych akcji).
 4. Aktualizacja i sprawdzenie stanu celów w GameLogic.
@@ -32,7 +32,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT8MainGoalUnachievedWhenBothRequirementsAndSubgoalsNotMet(unittest.TestCase):

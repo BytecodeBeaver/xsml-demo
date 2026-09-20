@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T3
 Opis: Sprawdź czy rezultat akcji wykonuje się poprawnie - czy zmiany nim spowodowane zostają nałożone w przypadku jego wystąpienia.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Sprawdzenie stanu początkowego (brak zmiennej 'weak_user_password_detected' w ekwipunku).
 3. Wykonanie akcji 'check_user_password' przez grę (game_logic.execute_action).
 4. Weryfikacja czy stan gry po wykonaniu akcji został zaktualizowany zgodnie z sekcją 'produces' akcji:
@@ -31,7 +31,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT3ActionExecutionAndStateChanges(unittest.TestCase):

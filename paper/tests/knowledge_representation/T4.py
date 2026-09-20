@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T4
 Opis: Sprawdź czy akcja, której warunki nie są spełnione nie jest dostępna dla gracza.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Weryfikacja dostępności akcji 'set_strong_root_password', która wymaga w ekwipunku 'weak_user_password_detected: true'.
 3. Weryfikacja dostępności akcji 'enable_firewall', która wymaga w ekwipunku 'firewall_status_checked: true'.
 4. Sprawdzenie flagi available dla tych akcji w stanie początkowym (przed spełnieniem warunków).
@@ -31,7 +31,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT4UnavailableActionRequirements(unittest.TestCase):

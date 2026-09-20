@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T7
 Opis: Sprawdź czy cel główny jest uznany za nieosiągnięty, jeśli są spełnione warunki celu głównego, ale cele szczegółowe (subgoals) nie są osiągnięte.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Weryfikacja, że warunki własne celu głównego 'complete_hardening_of_linux_system' są spełnione (requires: inventory: {}, worldstate: {}).
 3. Sprawdzenie, że podcele celu głównego nie zostały jeszcze zrealizowane (lub zrealizowano tylko część z nich).
 4. Sprawdzenie wartości atrybutu achieved dla celu głównego.
@@ -31,7 +31,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT7MainGoalUnachievedWhenSubgoalsIncomplete(unittest.TestCase):

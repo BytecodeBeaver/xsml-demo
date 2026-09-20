@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T9
 Opis: Cel główny powinien być uznany za nieosiągnięty, jeśli cel główny ma niespełnione warunki, ale wszystkie cele szczegółowe (subgoals) zostały osiągnięte.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Skonfigurowanie w celu głównym 'complete_hardening_of_linux_system' dodatkowego niespełnionego wymagania (np. requires: worldstate: {'formal_report_signed': True}).
 3. Wykonanie wszystkich akcji scenariusza ('check_user_password', 'set_strong_root_password', 'check_firewall_status', 'enable_firewall') w celu pełnego zrealizowania wszystkich podcelów.
 4. Weryfikacja czy wszystkie podcele uzyskały status achieved == True.
@@ -33,7 +33,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT9MainGoalUnachievedWhenSubgoalsMetButOwnRequirementsNotMet(unittest.TestCase):

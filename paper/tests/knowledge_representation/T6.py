@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T6
 Opis: Sprawdź czy cel główny jest uznany za osiągnięty, jeśli cele szczegółowe (subgoals) zostały osiągnięte i warunek celu głównego także został osiągnięty.
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Sprawdzenie stanu początkowego celu głównego 'complete_hardening_of_linux_system' (achieved == False).
 3. Wykonanie pełnej sekwencji akcji realizującej wszystkie podcele:
    - 'check_user_password' -> realizuje podcel 'identify_weak_root_password'
@@ -35,7 +35,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT6MainGoalAchievedWhenRequirementsAndSubgoalsMet(unittest.TestCase):

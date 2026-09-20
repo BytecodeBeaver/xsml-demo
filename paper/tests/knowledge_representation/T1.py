@@ -1,10 +1,10 @@
 """
 Przypadek testowy: T1
 Opis: Sprawdź czy zmienna trafiająca do świata gry (worldstate) nie jest dostępna z poziomu ekwipunku (inventory).
-Scenariusz bazowy: data/missions/hardening_linux_no_comment.yaml
+Scenariusz bazowy: data/missions/hardening_linux.yaml
 
 Kroki testowe:
-1. Wczytanie scenariusza 'hardening_linux_no_comment.yaml'.
+1. Wczytanie scenariusza 'hardening_linux.yaml'.
 2. Odczytanie zmiennej 'firewall_enabled', która jest zdefiniowana w stanie świata gry (worldstate: firewall_enabled: false).
 3. Próba odczytania zmiennej 'firewall_enabled' z poziomu ekwipunku gracza (inventory).
 4. Modyfikacja stanu świata za pomocą set_worldstate_variable i ponowna weryfikacja izolacji od ekwipunku.
@@ -30,7 +30,7 @@ if PROJECT_ROOT not in sys.path:
 from parser.parser import XSMLParser, SimulationScenario
 from game.game_logic import GameLogic
 
-MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux_no_comment.yaml")
+MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
 
 
 class TestT1WorldstateIsolationFromInventory(unittest.TestCase):
