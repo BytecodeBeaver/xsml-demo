@@ -33,6 +33,24 @@ interface Hint {
   hint: string;
 }
 
+interface WalkthroughAction {
+  id: string;
+  description: string;
+}
+
+interface WalkthroughStep {
+  from_description: string;
+  to_description: string;
+  actions: WalkthroughAction[];
+}
+
+interface Walkthrough {
+  id: string;
+  goal: string;
+  goal_description: string;
+  steps: WalkthroughStep[];
+}
+
 function getRequiredElement(id: string): HTMLElement {
   const element = document.getElementById(id);
   if (!element) {
@@ -54,6 +72,12 @@ const actionsList = getRequiredElement('actions-list');
 const hintsList = getRequiredElement('hints-list');
 const sideTabs = Array.from(document.querySelectorAll<HTMLButtonElement>('.side-tab'));
 const sidePanels = Array.from(document.querySelectorAll<HTMLElement>('.side-panel-content'));
+const walkthroughListView = getRequiredElement('walkthrough-list-view');
+const walkthroughList = getRequiredElement('walkthrough-list');
+const walkthroughDetailView = getRequiredElement('walkthrough-detail-view');
+const walkthroughBackButton = getRequiredElement('walkthrough-back');
+const walkthroughTitle = getRequiredElement('walkthrough-title');
+const walkthroughSteps = getRequiredElement('walkthrough-steps');
 
 const NICKNAME_PATTERN = /^[A-Za-z0-9 _-]{1,24}$/;
 const NICKNAME_STORAGE_KEY = 'game.nickname';
@@ -65,6 +89,9 @@ let resizeObserver: ResizeObserver | null = null;
 let socket: Socket | null = null;
 let inputBuffer = '';
 let hintsRefreshInterval: number | null = null;
+let currentScenarioId: string | null = null;
+let loadedWalkthroughScenarioId: string | null = null;
+let loadedWalkthroughs: Walkthrough[] = [];
 
 function resizeTerminal(): void {
   if (!terminal || !fitAddon) {
@@ -128,7 +155,102 @@ function activateTab(tabName: string): void {
   for (const panel of sidePanels) {
     panel.hidden = panel.dataset.panel !== tabName;
   }
+  if (tabName === 'walkthroughs' && currentScenarioId && loadedWalkthroughScenarioId !== currentScenarioId) {
+    void loadWalkthroughs(currentScenarioId);
+  }
 }
+
+async function loadWalkthroughs(scenarioId: string): Promise<void> {
+  showWalkthroughList();
+  walkthroughList.innerHTML = '<li>Ladowanie...</li>';
+
+  try {
+    const response = await fetch(`/api/scenarios/${encodeURIComponent(scenarioId)}/walkthrough`);
+    if (!response.ok) {
+      throw new Error(`Serwer zwrocil status ${response.status}`);
+    }
+    loadedWalkthroughs = await response.json();
+    loadedWalkthroughScenarioId = scenarioId;
+    renderWalkthroughList();
+  } catch (error) {
+    walkthroughList.innerHTML = `<li>Nie udalo sie pobrac scenariuszy: ${(error as Error).message}</li>`;
+  }
+}
+
+function renderWalkthroughList(): void {
+  walkthroughList.innerHTML = '';
+
+  if (loadedWalkthroughs.length === 0) {
+    walkthroughList.innerHTML = '<li>Brak scenariuszy dla tej misji.</li>';
+    return;
+  }
+
+  loadedWalkthroughs.forEach((walkthrough, index) => {
+    const item = document.createElement('li');
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'scenario-option';
+    button.innerHTML = `<strong>${formatWalkthroughLabel(walkthrough, index)}</strong>`;
+    button.addEventListener('click', () => showWalkthroughDetail(walkthrough, index));
+    item.appendChild(button);
+    walkthroughList.appendChild(item);
+  });
+}
+
+function formatWalkthroughLabel(walkthrough: Walkthrough, index: number): string {
+  return `Scenariusz ${index + 1}: ${walkthrough.goal_description}`;
+}
+
+function showWalkthroughList(): void {
+  walkthroughListView.hidden = false;
+  walkthroughDetailView.hidden = true;
+  // Clear the previously viewed scenario's steps so they aren't left behind for next time.
+  walkthroughTitle.textContent = '';
+  walkthroughSteps.innerHTML = '';
+}
+
+function showWalkthroughDetail(walkthrough: Walkthrough, index: number): void {
+  walkthroughTitle.textContent = formatWalkthroughLabel(walkthrough, index);
+  walkthroughSteps.innerHTML = '';
+  walkthroughSteps.appendChild(buildWalkthroughNode(walkthrough));
+
+  walkthroughListView.hidden = true;
+  walkthroughDetailView.hidden = false;
+}
+
+function buildWalkthroughNode(walkthrough: Walkthrough): HTMLLIElement {
+  const item = document.createElement('li');
+  const stepList = document.createElement('ol');
+  stepList.className = 'walkthrough-step-list';
+
+  walkthrough.steps.forEach((step, index) => {
+    const stepItem = document.createElement('li');
+    stepItem.className = 'walkthrough-step';
+
+    const heading = document.createElement('div');
+    heading.className = 'walkthrough-step-heading';
+    heading.textContent = `${index + 1}. ${step.to_description}`;
+    stepItem.appendChild(heading);
+
+    const actionList = document.createElement('ul');
+    actionList.className = 'walkthrough-action-list';
+    for (const action of step.actions) {
+      const actionItem = document.createElement('li');
+      actionItem.textContent = action.description;
+      actionList.appendChild(actionItem);
+    }
+    stepItem.appendChild(actionList);
+
+    stepList.appendChild(stepItem);
+  });
+
+  item.appendChild(stepList);
+  return item;
+}
+
+walkthroughBackButton.addEventListener('click', showWalkthroughList);
+
+
 
 async function loadScenarios(): Promise<void> {
   scenarioStatus.textContent = 'Ladowanie scenariuszy...';
@@ -178,6 +300,12 @@ function startGame(scenarioId: string, nickname: string): void {
   scenarioScreen.hidden = true;
   gameScreen.hidden = false;
   activeNicknameLabel.textContent = `Gracz: ${nickname}`;
+  currentScenarioId = scenarioId;
+  loadedWalkthroughScenarioId = null;
+  loadedWalkthroughs = [];
+  walkthroughList.innerHTML = '';
+  walkthroughSteps.innerHTML = '';
+  showWalkthroughList();
 
   setupTerminal();
   terminal?.reset();

@@ -8,7 +8,7 @@
     <body>
       <main id="app">
         <section id="scenario-screen">
-          <h1>Wybierz scenariusz</h1>
+          <h1>Wybierz misję</h1>
           <div id="nickname-field">
             <label for="nickname-input">Nick</label>
             <input id="nickname-input" type="text" maxlength="24" placeholder="Wpisz swoj nick" autocomplete="off" />
@@ -18,7 +18,7 @@
         </section>
         <section id="game-screen" hidden>
           <div id="game-header">
-            <button id="back-to-scenarios" type="button">&larr; Wybor scenariusza</button>
+            <button id="back-to-scenarios" type="button">&larr; Wybór misji</button>
             <span id="active-nickname"></span>
           </div>
           <div id="game-layout">
@@ -30,6 +30,7 @@
                 <button class="side-tab" type="button" data-tab="goals" role="tab">Cele</button>
                 <button class="side-tab" type="button" data-tab="actions" role="tab">Akcje</button>
                 <button class="side-tab" type="button" data-tab="hints" role="tab">Podpowiedzi</button>
+                <button class="side-tab" type="button" data-tab="walkthroughs" role="tab">Scenariusze</button>
               </div>
               <div class="side-panel-content" data-panel="goals" role="tabpanel">
                 <ul id="goals-list" class="panel-list"></ul>
@@ -39,6 +40,16 @@
               </div>
               <div class="side-panel-content" data-panel="hints" role="tabpanel">
                 <ul id="hints-list" class="panel-list"></ul>
+              </div>
+              <div class="side-panel-content" data-panel="walkthroughs" role="tabpanel">
+                <div id="walkthrough-list-view">
+                  <ul id="walkthrough-list" class="panel-list"></ul>
+                </div>
+                <div id="walkthrough-detail-view" hidden>
+                  <button id="walkthrough-back" type="button">&larr; Wszystkie scenariusze</button>
+                  <h3 id="walkthrough-title"></h3>
+                  <ol id="walkthrough-steps" class="panel-list"></ol>
+                </div>
               </div>
             </div>
           </div>

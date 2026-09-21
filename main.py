@@ -61,6 +61,56 @@ def serialize_hints(game_logic: GameLogic) -> dict:
     }
 
 
+def build_walkthroughs(scenario: SimulationScenario) -> list:
+    """Turn each mission.scenarios graph into a linear, ordered list of steps
+    (with alternative actions grouped per step) leading from start to goal."""
+    actions_by_id = {action["id"]: action for action in scenario.actions}
+    goal_descriptions = {
+        goal["id"]: goal["description"]
+        for goal in XSMLParser.iter_nested_goals(scenario.goals)
+    }
+    walkthroughs = []
+    for walkthrough in scenario.scenarios:
+        nodes = walkthrough["nodes"]
+        transitions = walkthrough["transitions"]
+
+        transitions_from: Dict[str, list] = {}
+        target_nodes = set()
+        for transition in transitions:
+            transitions_from.setdefault(transition["from"], []).append(transition)
+            target_nodes.add(transition["to"])
+
+        start_candidates = [node_id for node_id in nodes if node_id not in target_nodes]
+        current = start_candidates[0] if start_candidates else next(iter(nodes), None)
+
+        steps = []
+        visited = set()
+        while current is not None and current in transitions_from and current not in visited:
+            visited.add(current)
+            group = transitions_from[current]
+            next_node = group[0]["to"]
+            steps.append({
+                "from_description": nodes[current]["description"],
+                "to_description": nodes[next_node]["description"],
+                "actions": [
+                    {
+                        "id": transition["action_trigger"],
+                        "description": actions_by_id.get(transition["action_trigger"], {}).get("description", transition["action_trigger"]),
+                    }
+                    for transition in group
+                ],
+            })
+            current = next_node
+
+        walkthroughs.append({
+            "id": walkthrough["id"],
+            "goal": walkthrough["goal"],
+            "goal_description": goal_descriptions.get(walkthrough["goal"], walkthrough["goal"]),
+            "steps": steps,
+        })
+    return walkthroughs
+
+
 def create_app() -> Tuple[Flask, SocketIO]:
     app = Flask(__name__, static_folder='game/html/dist', static_url_path='')
     socketio = SocketIO(app)
@@ -87,6 +137,14 @@ def create_app() -> Tuple[Flask, SocketIO]:
                 "description": scenario.description,
             })
         return jsonify(scenarios)
+
+    @app.route('/api/scenarios/<scenario_id>/walkthrough')
+    def get_scenario_walkthrough(scenario_id):
+        path = scenario_paths.get(scenario_id)
+        if path is None:
+            return jsonify({"message": f"Nieznany scenariusz: {scenario_id}"}), 404
+        scenario = load_scenario(path)
+        return jsonify(build_walkthroughs(scenario))
 
     @socketio.on('connect', namespace='/ws/game')
     def handle_connect():
