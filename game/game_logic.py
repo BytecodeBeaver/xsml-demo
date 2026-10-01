@@ -1,4 +1,4 @@
-from parser.parser import SimulationScenario
+from parser.parser import SimulationMission
 from typing import Dict
 from time import monotonic
 
@@ -86,7 +86,7 @@ class SimulationHint:
         self.player_idle_time = self.requires.get("inventory", {}).get("player_idle_time")
 
 class GameLogic:
-    def __init__(self, scenario: SimulationScenario):
+    def __init__(self, scenario: SimulationMission):
         self.scenario = scenario
         self.goals: Dict[str, SimulationGoal] = {
             goal.id: goal

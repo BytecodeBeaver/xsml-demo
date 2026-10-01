@@ -27,7 +27,7 @@ PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from parser.parser import XSMLParser, SimulationScenario
+from parser.parser import XSMLParser, SimulationMission
 from game.game_logic import GameLogic
 
 MISSION_PATH = os.path.join(PROJECT_ROOT, "data", "missions", "hardening_linux.yaml")
@@ -37,7 +37,7 @@ class TestT5AvailableActionRequirements(unittest.TestCase):
     def setUp(self):
         with open(MISSION_PATH, "r", encoding="utf-8") as file:
             yaml_data = yaml.safe_load(file)
-        self.scenario: SimulationScenario = XSMLParser.parse(yaml_data)
+        self.scenario: SimulationMission = XSMLParser.parse(yaml_data)
         self.game_logic = GameLogic(self.scenario)
 
     def test_initial_actions_with_empty_requirements_are_available(self):

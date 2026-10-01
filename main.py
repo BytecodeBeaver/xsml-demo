@@ -7,7 +7,7 @@ import yaml
 from flask import Flask, jsonify, request
 from flask_socketio import SocketIO, emit
 
-from parser.parser import SimulationScenario, XSMLParser
+from parser.parser import SimulationMission, XSMLParser
 from game.game_logic import GameLogic, SimulationGoal
 
 MISSIONS_DIR = os.path.join(os.path.dirname(__file__), 'data', 'missions')
@@ -26,7 +26,7 @@ def discover_scenarios() -> Dict[str, str]:
     return scenarios
 
 
-def load_scenario(path: str) -> SimulationScenario:
+def load_scenario(path: str) -> SimulationMission:
     with open(path, 'r', encoding='utf-8') as file:
         yaml_data = yaml.safe_load(file)
     return XSMLParser.parse(yaml_data)
@@ -61,7 +61,7 @@ def serialize_hints(game_logic: GameLogic) -> dict:
     }
 
 
-def build_walkthroughs(scenario: SimulationScenario) -> list:
+def build_walkthroughs(scenario: SimulationMission) -> list:
     """Turn each mission.scenarios graph into a linear, ordered list of steps
     (with alternative actions grouped per step) leading from start to goal."""
     actions_by_id = {action["id"]: action for action in scenario.actions}
