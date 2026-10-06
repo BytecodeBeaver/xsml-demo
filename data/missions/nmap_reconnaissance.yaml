@@ -185,8 +185,26 @@ mission:
           ports_scanned: false
         worldstate:
           target_reachable: true
+    - id: "suggest_quick_port_scan"
+      hint: "Pełny skan może potrwać dłużej. Do szybkiego rozpoznania użyj nmap --top-ports 100 192.168.1.10."
+      requires:
+        inventory:
+          player_idle_time: 15
+          target_discovered: true
+          ports_scanned: false
+        worldstate:
+          target_reachable: true
     - id: "suggest_service_detection"
       hint: "Porty zostały znalezione. Sprawdź wersje dostępnych usług."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ports_scanned: true
+          service_detection_completed: false
+        worldstate:
+          target_reachable: true
+    - id: "suggest_extended_service_detection"
+      hint: "Użyj nmap -sV, aby poznać wersje usług; nmap -A --version-light wykona szersze rozpoznanie."
       requires:
         inventory:
           player_idle_time: 15

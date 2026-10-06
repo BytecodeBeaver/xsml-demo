@@ -158,6 +158,14 @@ mission:
           player_idle_time: 15
           ssh_service_checked: false
         worldstate: {}
+    - id: "suggest_ssh_network_probe"
+      hint: "Jeśli nie masz dostępu do serwera, sprawdź sieciowo port 22 poleceniem nc -vz server.local 22."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_service_checked: false
+        worldstate:
+          ssh_service_available: false
     - id: "suggest_ssh_credentials"
       hint: "Usługa SSH jest dostępna. Spróbuj zweryfikować dane użytkownika."
       requires:
@@ -167,8 +175,26 @@ mission:
           ssh_credentials_verified: false
         worldstate:
           ssh_service_available: true
+    - id: "suggest_ssh_key_verification"
+      hint: "Możesz sprawdzić odcisk klucza poleceniem ssh-keygen -lf ~/.ssh/id_ed25519.pub i przetestować logowanie bez hasła."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_service_checked: true
+          ssh_credentials_verified: false
+        worldstate:
+          ssh_service_available: true
     - id: "suggest_ssh_connection"
       hint: "Dane uwierzytelniające są poprawne. Nawiąż sesję SSH."
+      requires:
+        inventory:
+          player_idle_time: 15
+          ssh_credentials_verified: true
+        worldstate:
+          ssh_service_available: true
+          ssh_access_established: false
+    - id: "suggest_ssh_tunnel"
+      hint: "Możesz też utworzyć tunel SSH: ssh -N -L 8080:localhost:80 analyst@server.local."
       requires:
         inventory:
           player_idle_time: 15

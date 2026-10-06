@@ -144,6 +144,15 @@ mission:
           weak_user_password_detected: true
           changed_root_password: false
         worldstate: {}
+    - id: "suggest_firewall_status_after_password_change"
+      hint: "Hasło zostało zmienione. Sprawdź teraz, czy zapora sieciowa jest aktywna."
+      requires:
+        inventory:
+          player_idle_time: 15
+          changed_root_password: true
+          firewall_status_checked: false
+        worldstate:
+          firewall_enabled: false
     - id: "suggest_firewall_enable"
       hint: "Zapora sieciowa nie jest aktywna, co możesz teraz zrobić?"
       requires:
@@ -152,6 +161,15 @@ mission:
           firewall_status_checked: true
         worldstate:
           firewall_enabled: false
+    - id: "suggest_password_after_firewall_enable"
+      hint: "Zapora jest już aktywna. Wróć do wyniku kontroli hasła i ustaw silne hasło root."
+      requires:
+        inventory:
+          player_idle_time: 15
+          weak_user_password_detected: true
+          changed_root_password: false
+        worldstate:
+          firewall_enabled: true
   scenarios:
     - id: "linux_hardening_walkthrough"
       goal: "complete_hardening_of_linux_system"
