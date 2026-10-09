@@ -1,29 +1,28 @@
-"""Feature matrices for comparing hierarchical XSML with flat CSV records.
-
-Rows describe XSML state-variable valuations, not actions. Boolean variables
-are exhaustively varied between false and true; targets are kept separate from
-predictors and contain one binary column per support-hint ID.
-"""
-
 from __future__ import annotations
 
+import argparse
 import copy
 from dataclasses import dataclass
-import hashlib
 from itertools import product
 import json
 import math
 from pathlib import Path
+import random
+import sys
 from typing import Any, Iterable
 
 import pandas as pd
+import yaml
+
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from parser.parser import SimulationMission, XSMLParser
 
 
 @dataclass(frozen=True)
 class FeatureMatrices:
-    """Paired predictor matrices and targets for the same state snapshots."""
+    """Macierze cech i zmiennych docelowych dla tych samych migawek stanu."""
 
     xsml: pd.DataFrame
     flat: pd.DataFrame
@@ -32,12 +31,12 @@ class FeatureMatrices:
 
 
 def _json_value(value: Any) -> str:
-    """Serialize YAML scalar values consistently for feature names and CSV."""
+    """Serializuje wartości skalarne YAML w spójny sposób na potrzeby nazw cech i plików CSV."""
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def _feature_value_label(value: Any) -> str:
-    """Format a category label readably, without JSON wrappers or prefixes."""
+    """Formatuje czytelną etykietę kategorii bez opakowania JSON ani prefiksów."""
     if isinstance(value, bool):
         return str(value).lower()
     if value is None:
@@ -50,7 +49,7 @@ def _feature_value_label(value: Any) -> str:
 
 
 def _requirements_match(requirements: dict, inventory: dict, worldstate: dict) -> bool:
-    """Match GameLogic semantics, including absent variables required as false."""
+    """Stosuje semantykę GameLogic, także dla nieobecnych zmiennych wymaganych jako false."""
     for name, expected in requirements.get("inventory", {}).items():
         if name == "player_idle_time":
             continue
@@ -75,13 +74,11 @@ def _walk_goals(goals: list[dict]) -> Iterable[dict]:
 
 
 class XSMLFeatureExtractor:
-    """Generate state matrices from every XSML-declared Boolean valuation.
+    """Generuje macierze stanu dla wszystkich wartości boolowskich zadeklarowanych w XSML.
 
-    XSML predictors are a sparse, proposition-style encoding: each possible
-    inventory/worldstate value becomes a Boolean feature, alongside action and
-    goal predicates, elapsed idle time, and a 16-value goal-hierarchy embedding.
-    The paired builder returns both the XSML projection and a flat categorical
-    projection from the same parsed mission.
+    Każda możliwa wartość ekwipunku lub stanu świata staje się cechą boolowską. Uwzględniane
+    są także predykaty działań i celów, upływający czas bezczynności oraz reprezentacja
+    hierarchii celów.
     """
 
     def __init__(
@@ -90,19 +87,21 @@ class XSMLFeatureExtractor:
         *,
         max_states: int = 10_000,
         inventory_noise_variants: int = 2,
+        random_seed: int | None = 42,
     ):
         self.mission = mission
         self.max_states = max_states
         if inventory_noise_variants < 0:
             raise ValueError("Liczba wariantów szumu inventory nie może być ujemna.")
         self.inventory_noise_variants = inventory_noise_variants
+        self.random = random.Random(random_seed)
         self.actions = list(mission.actions or [])
         self.goals = list(_walk_goals(mission.goals or []))
         self.hints = list(mission.support or [])
         self.inventory_names, self.worldstate_names = self._collect_state_variables()
         self.inventory_domains, self.worldstate_domains = self._collect_state_domains()
         self.idle_times = self._collect_idle_times()
-        self.goal_hierarchy_embedding = self._embed_goal_hierarchy()
+        self.goal_hierarchy = self._describe_goal_hierarchy()
 
     def _collect_state_variables(self) -> tuple[list[str], list[str]]:
         inventory_names = set((self.mission.inventory or {}).keys())
@@ -128,7 +127,7 @@ class XSMLFeatureExtractor:
         return sorted(inventory_names), sorted(worldstate_names)
 
     def _collect_state_domains(self) -> tuple[dict[str, list[Any]], dict[str, list[Any]]]:
-        """Collect values declared in XSML, expanding Boolean facts to both values."""
+        """Zbiera wartości zadeklarowane w XSML, rozszerzając fakty boolowskie o obie wartości."""
         values_by_scope: dict[str, dict[str, list[Any]]] = {
             "inventory": {name: [] for name in self.inventory_names},
             "worldstate": {name: [] for name in self.worldstate_names},
@@ -170,33 +169,29 @@ class XSMLFeatureExtractor:
                     domains[scope][name] = sorted(candidates, key=_json_value)
         return domains["inventory"], domains["worldstate"]
 
-    def _embed_goal_hierarchy(self) -> list[float]:
-        """Create a deterministic 16-dimensional hashed structural embedding."""
-        dimensions = 16
-        embedding = [0.0] * dimensions
-        tokens: list[str] = []
+    def _describe_goal_hierarchy(self) -> dict[str, dict[str, Any]]:
+        """Zwraca jawne metadane strukturalne dla każdego celu."""
+        hierarchy: dict[str, dict[str, Any]] = {}
 
-        def visit(goal: dict, depth: int, sibling_count: int, parent_id: str | None = None) -> None:
-            children = goal.get("subgoals", [])
+        def visit(goal: dict, depth: int, sibling_count: int, parent_id: str | None) -> None:
             goal_id = goal["id"]
-            tokens.append(f"node:{goal_id}:{depth}:{sibling_count}:{len(children)}")
-            if parent_id is not None:
-                tokens.append(f"edge:{parent_id}->{goal_id}")
+            children = goal.get("subgoals", [])
+            hierarchy[goal_id] = {
+                "goal_depth": depth,
+                "number_of_children": len(children),
+                "is_leaf": not children,
+                "is_root": parent_id is None,
+                "number_of_ancestors": depth,
+                "number_of_siblings": sibling_count,
+                "parent_id": parent_id,
+            }
             for child in children:
-                visit(child, depth + 1, len(children), goal_id)
+                visit(child, depth + 1, len(children) - 1, goal_id)
 
         roots = self.mission.goals or []
         for goal in roots:
-            visit(goal, 0, len(roots))
-
-        for token in tokens:
-            digest = hashlib.sha256(token.encode("utf-8")).digest()
-            bucket = int.from_bytes(digest[:4], "big") % dimensions
-            embedding[bucket] += 1.0 if digest[4] & 1 else -1.0
-        norm = math.sqrt(sum(value * value for value in embedding))
-        if norm:
-            embedding = [value / norm for value in embedding]
-        return embedding
+            visit(goal, 0, len(roots) - 1, None)
+        return hierarchy
 
     def _collect_idle_times(self) -> list[float]:
         thresholds = {
@@ -212,22 +207,15 @@ class XSMLFeatureExtractor:
             times.add(threshold)
         return sorted(times)
 
-    def _randomized_elapsed_seconds(self, state_key: str, scheduled_time: float) -> float:
-        """Sample reproducibly inside the same side of the 15-second threshold."""
-        digest = hashlib.sha256(
-            f"{self.mission.id}|{state_key}|elapsed:{scheduled_time}".encode("utf-8")
-        ).digest()
-        unit_interval = int.from_bytes(digest[:8], "big") / (1 << 64)
+    def _randomized_elapsed_seconds(self, scheduled_time: float) -> float:
+        """Losuje wartość po tej samej stronie progu 15 sekund co zaplanowany czas."""
+        unit_interval = self.random.random()
         if scheduled_time < 15.0:
             return unit_interval * 15.0
         return 15.0 + unit_interval * 15.0
 
-    @staticmethod
-    def _state_key(inventory: dict, worldstate: dict) -> str:
-        return json.dumps([inventory, worldstate], ensure_ascii=False, sort_keys=True, default=str)
-
     def _noisy_inventory_variants(self, inventory: dict) -> list[dict]:
-        """Return distinct, reproducible alternative player beliefs for inventory."""
+        """Zwraca różne, powtarzalne warianty alternatywnego obrazu ekwipunku gracza."""
         if not self.inventory_noise_variants or not self.inventory_names:
             return []
 
@@ -237,13 +225,9 @@ class XSMLFeatureExtractor:
             variant = dict(zip(self.inventory_names, values))
             if variant == inventory:
                 continue
-            encoded = _json_value(variant)
-            order_key = hashlib.sha256(
-                f"{self.mission.id}|inventory-noise|{encoded}".encode("utf-8")
-            ).hexdigest()
-            alternatives.append((order_key, variant))
-        alternatives.sort(key=lambda item: item[0])
-        return [variant for _, variant in alternatives[: self.inventory_noise_variants]]
+            alternatives.append(variant)
+        count = min(self.inventory_noise_variants, len(alternatives))
+        return self.random.sample(alternatives, count)
 
     def _outcomes(self, action: dict) -> Iterable[dict]:
         for produced in action.get("produces") or []:
@@ -321,8 +305,8 @@ class XSMLFeatureExtractor:
             record[f"action_available.{action['id']}"] = _requirements_match(
                 action.get("requires") or {}, inventory, worldstate
             )
-        for goal_id, achieved in sorted(self._goal_values(inventory, worldstate).items()):
-            record[f"goal_achieved.{goal_id}"] = achieved
+        for goal_id, completed in sorted(self._goal_values(inventory, worldstate).items()):
+            record[f"goal_completed.{goal_id}"] = completed
         return record
 
     def _xsml_features(self, record: dict) -> dict:
@@ -340,18 +324,34 @@ class XSMLFeatureExtractor:
                         column = f"{feature_name}=={_feature_value_label(candidate)}"
                         features[column] = value == candidate
         for action in self.actions:
-            features[f"action_available::{action['id']}"] = record[f"action_available.{action['id']}"]
-        for goal_id in sorted(goal["id"] for goal in self.goals):
-            features[f"goal_achieved::{goal_id}"] = record[f"goal_achieved.{goal_id}"]
-        for index, value in enumerate(self.goal_hierarchy_embedding):
-            features[f"goal_hierarchy_embedding::{index:02d}"] = value
+            features[f"action_available.{action['id']}"] = record[f"action_available.{action['id']}"]
+        goal_values = self._goal_values_from_record(record)
+        for goal_id, metadata in self.goal_hierarchy.items():
+            features[f"goal_completed.{goal_id}"] = goal_values[goal_id]
+            for key in (
+                "goal_depth",
+                "number_of_children",
+                "is_leaf",
+                "is_root",
+                "number_of_ancestors",
+                "number_of_siblings",
+            ):
+                features[f"{key}.{goal_id}"] = metadata[key]
+            parent_id = metadata["parent_id"]
+            features[f"parent_completed.{goal_id}"] = (
+                goal_values[parent_id] if parent_id is not None else False
+            )
         return features
 
+    def _goal_values_from_record(self, record: dict) -> dict[str, bool]:
+        return {
+            goal_id: bool(record[f"goal_completed.{goal_id}"])
+            for goal_id in self.goal_hierarchy
+        }
+
     def _state_feature_name(self, scope: str, name: str) -> str:
-        """Prefer bare names; prefix worldstate only when inventory collides."""
-        if scope == "worldstate" and name in self.inventory_names:
-            return f"worldstate::{name}"
-        return name
+        """Używa tej samej nazwy stanu z kwalifikatorem zakresu w obu macierzach cech."""
+        return f"{scope}.{name}"
 
     def _column_schemas(self) -> tuple[list[str], list[str]]:
         fact_columns = []
@@ -367,27 +367,40 @@ class XSMLFeatureExtractor:
                         f"{feature_name}=={_feature_value_label(value)}" for value in values
                     )
         feature_columns = ["elapsed_seconds", *fact_columns]
-        feature_columns.extend(f"action_available::{action['id']}" for action in self.actions)
-        feature_columns.extend(f"goal_achieved::{goal['id']}" for goal in sorted(self.goals, key=lambda item: item["id"]))
-        feature_columns.extend(f"goal_hierarchy_embedding::{index:02d}" for index in range(16))
+        feature_columns.extend(f"action_available.{action['id']}" for action in self.actions)
+        for goal_id in sorted(self.goal_hierarchy):
+            feature_columns.append(f"goal_completed.{goal_id}")
+            feature_columns.extend(
+                f"{key}.{goal_id}"
+                for key in (
+                    "goal_depth",
+                    "number_of_children",
+                    "is_leaf",
+                    "is_root",
+                    "number_of_ancestors",
+                    "number_of_siblings",
+                    "parent_completed",
+                )
+            )
         return feature_columns, [f"hint::{hint['id']}" for hint in sorted(self.hints, key=lambda item: item["id"])]
 
     def extract_training_data(self) -> FeatureMatrices:
-        """Return feature projections and multilabel targets for this mission.
+        """Zwraca projekcje cech i wieloetykietowe zmienne docelowe dla tej misji.
 
-        ``flat_records`` is the target-free, CSV-ready snapshot table. The
-        paired matrices are projections of the same generated snapshots.
-        Targets remain separate to prevent leakage.
+        ``flat_records`` to tabela migawek bez zmiennych docelowych, gotowa do
+        zapisania w CSV. Powiązane macierze są projekcjami tych samych
+        wygenerowanych migawek. Zmienne docelowe pozostają oddzielone, aby
+        zapobiec wyciekowi danych.
         """
         raw_records = []
         xsml_rows = []
         target_rows = []
+        sample_number = 0
         for inventory, worldstate in self._enumerate_states():
-            state_key = self._state_key(inventory, worldstate)
             for scheduled_time in self.idle_times:
-                digest = hashlib.sha256(f"{state_key}|{scheduled_time}".encode("utf-8")).hexdigest()[:16]
-                sample_id = f"{self.mission.id}:{digest}"
-                elapsed = self._randomized_elapsed_seconds(state_key, scheduled_time)
+                sample_id = f"{self.mission.id}:{sample_number}"
+                sample_number += 1
+                elapsed = self._randomized_elapsed_seconds(scheduled_time)
                 record = self._flat_record(inventory, worldstate, elapsed, sample_id)
                 raw_records.append(record)
                 xsml_rows.append(self._xsml_features(record))
@@ -421,7 +434,19 @@ class XSMLFeatureExtractor:
         sample_index = pd.Index(flat_records["sample_id"], name="sample_id")
         xsml.index = sample_index
         targets.index = sample_index
-        flat = FlatSnapshotFeatureExtractor(flat_records).extract_features()
+        categorical_domains = {
+            f"{scope}.{name}": domains[name]
+            for scope, names, domains in (
+                ("inventory", self.inventory_names, self.inventory_domains),
+                ("worldstate", self.worldstate_names, self.worldstate_domains),
+            )
+            for name in names
+            if not all(type(value) is bool for value in domains[name])
+        }
+        flat = FlatSnapshotFeatureExtractor(
+            flat_records, categorical_domains=categorical_domains
+        ).extract_features()
+        flat = flat.reindex(columns=[column for column in xsml.columns if column in flat.columns])
         flat.index = sample_index
         return FeatureMatrices(
             xsml=xsml,
@@ -435,26 +460,39 @@ class XSMLFeatureExtractor:
         columns.extend(f"inventory.{name}" for name in self.inventory_names)
         columns.extend(f"worldstate.{name}" for name in self.worldstate_names)
         columns.extend(f"action_available.{action['id']}" for action in self.actions)
-        columns.extend(f"goal_achieved.{goal['id']}" for goal in sorted(self.goals, key=lambda item: item["id"]))
+        columns.extend(f"goal_completed.{goal['id']}" for goal in sorted(self.goals, key=lambda item: item["id"]))
         return columns
 
     def extract_features(self) -> pd.DataFrame:
-        """Return the XSML proposition-style feature matrix (one row per snapshot)."""
+        """Zwraca macierz cech XSML w reprezentacji propozycjonalnej (jeden wiersz na migawkę)."""
         return self.extract_training_data().xsml
 
 
 class FlatSnapshotFeatureExtractor:
-    """Convert internally generated flat state snapshots into predictor columns."""
+    """Konwertuje wewnętrznie wygenerowane stany gry na kolumny cech."""
 
     METADATA_COLUMNS = {"sample_id", "mission_id"}
 
-    def __init__(self, records: pd.DataFrame):
+    def __init__(
+        self,
+        records: pd.DataFrame,
+        *,
+        categorical_domains: dict[str, list[Any]] | None = None,
+    ):
         self.records = records
+        self.categorical_domains = categorical_domains or {}
 
     def extract_features(self) -> pd.DataFrame:
         if not isinstance(self.records, pd.DataFrame):
             raise TypeError("Dane CSV muszą być obiektem pandas.DataFrame.")
-        return self.records.drop(columns=list(self.METADATA_COLUMNS), errors="ignore").copy()
+        features = self.records.drop(columns=list(self.METADATA_COLUMNS), errors="ignore").copy()
+        for source_column, values in self.categorical_domains.items():
+            if source_column not in features:
+                continue
+            observed = features.pop(source_column)
+            for value in values:
+                features[f"{source_column}=={_feature_value_label(value)}"] = observed.eq(value)
+        return features
 
 
 def build_paired_feature_matrices(
@@ -462,24 +500,26 @@ def build_paired_feature_matrices(
     *,
     max_states: int = 10_000,
     inventory_noise_variants: int = 2,
+    random_seed: int | None = 42,
 ) -> FeatureMatrices:
-    """Build paired features, including noisy player-inventory observations."""
+    """Buduje powiązane cechy z szumem ekwipunku i konfigurowalnym ziarnem generatora."""
     mission = XSMLParser.parse(copy.deepcopy(xsml_document))
     return XSMLFeatureExtractor(
         mission,
         max_states=max_states,
         inventory_noise_variants=inventory_noise_variants,
+        random_seed=random_seed,
     ).extract_training_data()
 
 
 def export_training_csv(matrices: FeatureMatrices, path: str) -> None:
-    """Write flat snapshot records and targets to separate CSV files."""
+    """Zapisuje płaskie rekordy migawek i zmienne docelowe w osobnych plikach CSV."""
     _write_csv(matrices.flat_records, Path(path))
     _write_csv(matrices.targets, Path(f"{path}.targets.csv"))
 
 
 def _write_csv(frame: pd.DataFrame, path: Path) -> None:
-    """Write a CSV with lowercase Boolean literals for readable raw values."""
+    """Zapisuje plik CSV z cechami boolowskimi."""
     output = frame.copy()
     for column in output.select_dtypes(include="bool").columns:
         output[column] = output[column].map({True: "true", False: "false"})
@@ -489,7 +529,7 @@ def _write_csv(frame: pd.DataFrame, path: Path) -> None:
 def export_paired_datasets(
     matrices: FeatureMatrices, output_dir: str | Path, prefix: str
 ) -> dict[str, Path]:
-    """Save both feature matrices and labels as CSV."""
+    """Zapisuje obie macierze cech i etykiety w formacie CSV."""
     directory = Path(output_dir)
     directory.mkdir(parents=True, exist_ok=True)
 
@@ -509,3 +549,69 @@ def export_paired_datasets(
     _write_csv(flat, paths["flat_features"])
     _write_csv(targets, paths["targets"])
     return paths
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Uruchamia ekstrakcję cech z pliku XSML za pośrednictwem wiersza poleceń."""
+    argument_parser = argparse.ArgumentParser(
+        description="Generuje macierze cech XSML i flat oraz etykiety podpowiedzi z misji XSML."
+    )
+    argument_parser.add_argument("mission", type=Path, help="Ścieżka do pliku misji XSML w formacie YAML.")
+    argument_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        default=Path("data/features"),
+        help="Katalog zapisu plików CSV (domyślnie: data/features).",
+    )
+    argument_parser.add_argument(
+        "--prefix",
+        help="Prefiks nazw plików wyjściowych (domyślnie: identyfikator misji).",
+    )
+    argument_parser.add_argument(
+        "--random-seed",
+        type=int,
+        default=42,
+        help="Ziarno generatora pseudolosowego (domyślnie: 42).",
+    )
+    argument_parser.add_argument(
+        "--inventory-noise-variants",
+        type=int,
+        default=2,
+        help="Liczba zaszumionych wariantów ekwipunku na migawkę (domyślnie: 2).",
+    )
+    argument_parser.add_argument(
+        "--max-states",
+        type=int,
+        default=10_000,
+        help="Maksymalna liczba enumerowanych stanów (domyślnie: 10000).",
+    )
+    args = argument_parser.parse_args(argv)
+
+    try:
+        with args.mission.open(encoding="utf-8") as mission_file:
+            mission_document = yaml.safe_load(mission_file)
+        if not isinstance(mission_document, dict):
+            raise ValueError("Dokument misji musi zawierać obiekt YAML na najwyższym poziomie.")
+        mission_id = mission_document.get("mission", {}).get("id", args.mission.stem)
+        matrices = build_paired_feature_matrices(
+            mission_document,
+            max_states=args.max_states,
+            inventory_noise_variants=args.inventory_noise_variants,
+            random_seed=args.random_seed,
+        )
+        paths = export_paired_datasets(
+            matrices,
+            args.output_dir,
+            args.prefix or mission_id,
+        )
+    except (OSError, ValueError, yaml.YAMLError) as error:
+        argument_parser.error(str(error))
+
+    print(f"Wygenerowano {len(matrices.xsml)} próbek.")
+    for path in paths.values():
+        print(path)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
