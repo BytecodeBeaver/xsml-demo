@@ -175,7 +175,9 @@ mission:
         inventory:
           player_idle_time: 15
           target_discovered: false
-        worldstate: {}
+          ports_scanned: false
+        worldstate:
+          target_reachable: false
     - id: "suggest_port_scan"
       hint: "Host odpowiada. Wykonaj skan wszystkich portów."
       requires:
@@ -183,6 +185,7 @@ mission:
           player_idle_time: 15
           target_discovered: true
           ports_scanned: false
+          service_detection_completed: false
         worldstate:
           target_reachable: true
     - id: "suggest_quick_port_scan"
@@ -192,6 +195,7 @@ mission:
           player_idle_time: 15
           target_discovered: true
           ports_scanned: false
+          service_detection_completed: false
         worldstate:
           target_reachable: true
     - id: "suggest_service_detection"
@@ -199,23 +203,29 @@ mission:
       requires:
         inventory:
           player_idle_time: 15
+          target_discovered: true
           ports_scanned: true
           service_detection_completed: false
         worldstate:
           target_reachable: true
+          services_identified: false
     - id: "suggest_extended_service_detection"
       hint: "Użyj nmap -sV, aby poznać wersje usług; nmap -A --version-light wykona szersze rozpoznanie."
       requires:
         inventory:
           player_idle_time: 15
+          target_discovered: true
           ports_scanned: true
           service_detection_completed: false
         worldstate:
           target_reachable: true
+          services_identified: false
 
   scenarios:
     - id: "nmap_reconnaissance_walkthrough"
       goal: "complete_nmap_reconnaissance"
+      start: "start"
+      final: "completed"
       nodes:
         start:
           id: "start"

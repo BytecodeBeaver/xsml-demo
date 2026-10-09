@@ -182,9 +182,14 @@ class XSMLParser:
             raise ValueError("Sekcja 'scenarios' musi być listą.")
         scenario_ids = []
         for scenario in scenarios:
-            XSMLParser.validate_required_fields(scenario, ("id", "goal", "nodes", "transitions"), "Scenariusz")
-            if not all(isinstance(scenario[field], str) and scenario[field] for field in ("id", "goal")):
-                raise ValueError("Identyfikator scenariusza i jego cel muszą być tekstami.")
+            XSMLParser.validate_required_fields(
+                scenario, ("id", "goal", "start", "final", "nodes", "transitions"), "Scenariusz"
+            )
+            if not all(
+                isinstance(scenario[field], str) and scenario[field]
+                for field in ("id", "goal", "start", "final")
+            ):
+                raise ValueError("Identyfikator, cel, początek i koniec scenariusza muszą być tekstami.")
             if scenario["goal"] not in goal_ids:
                 raise ValueError(f"Scenariusz '{scenario['id']}' wskazuje nieistniejący cel.")
             nodes = scenario["nodes"]
@@ -199,6 +204,10 @@ class XSMLParser:
                 node_ids.append(node["id"])
             if len(node_ids) != len(set(node_ids)):
                 raise ValueError(f"Węzły scenariusza '{scenario['id']}' muszą mieć unikalne identyfikatory.")
+            if scenario["start"] not in node_ids:
+                raise ValueError(f"Początkowy węzeł scenariusza '{scenario['id']}' nie istnieje.")
+            if scenario["final"] not in node_ids:
+                raise ValueError(f"Końcowy węzeł scenariusza '{scenario['id']}' nie istnieje.")
             for transition in transitions:
                 XSMLParser.validate_required_fields(transition, ("from", "to", "action_trigger"), "Przejscie scenariusza")
                 if transition["from"] not in node_ids or transition["to"] not in node_ids:

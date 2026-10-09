@@ -73,19 +73,16 @@ def build_walkthroughs(scenario: SimulationMission) -> list:
     for walkthrough in scenario.scenarios:
         nodes = walkthrough["nodes"]
         transitions = walkthrough["transitions"]
+        final_node = walkthrough["final"]
 
         transitions_from: Dict[str, list] = {}
-        target_nodes = set()
         for transition in transitions:
             transitions_from.setdefault(transition["from"], []).append(transition)
-            target_nodes.add(transition["to"])
-
-        start_candidates = [node_id for node_id in nodes if node_id not in target_nodes]
-        current = start_candidates[0] if start_candidates else next(iter(nodes), None)
+        current = walkthrough["start"]
 
         steps = []
         visited = set()
-        while current is not None and current in transitions_from and current not in visited:
+        while current != final_node and current in transitions_from and current not in visited:
             visited.add(current)
             group = transitions_from[current]
             next_node = group[0]["to"]

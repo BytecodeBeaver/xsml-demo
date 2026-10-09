@@ -128,14 +128,18 @@ mission:
         inventory:
           player_idle_time: 15
           weak_user_password_detected: false
+          changed_root_password: false
         worldstate: {}
     - id: "getting_started_2"
       hint: "Sprawdź dostępne akcje, może warto sprawdzić stan zapory sieciowej?"
       requires:
         inventory:
           player_idle_time: 15
+          weak_user_password_detected: true
+          changed_root_password: false
           firewall_status_checked: false
-        worldstate: {}
+        worldstate:
+          firewall_enabled: false
     - id: "suggest_password_change"
       hint: "Hasło użytkownika root jest słabe, co możesz teraz zrobić?"
       requires:
@@ -151,6 +155,7 @@ mission:
           player_idle_time: 15
           changed_root_password: true
           firewall_status_checked: false
+          weak_user_password_detected: true
         worldstate:
           firewall_enabled: false
     - id: "suggest_firewall_enable"
@@ -159,6 +164,7 @@ mission:
         inventory:
           player_idle_time: 15
           firewall_status_checked: true
+          changed_root_password: true
         worldstate:
           firewall_enabled: false
     - id: "suggest_password_after_firewall_enable"
@@ -168,11 +174,14 @@ mission:
           player_idle_time: 15
           weak_user_password_detected: true
           changed_root_password: false
+          firewall_status_checked: true
         worldstate:
           firewall_enabled: true
   scenarios:
     - id: "linux_hardening_walkthrough"
       goal: "complete_hardening_of_linux_system"
+      start: "start"
+      final: "completed"
       nodes:
         start:
           id: "start"
