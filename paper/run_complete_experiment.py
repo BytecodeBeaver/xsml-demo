@@ -36,16 +36,48 @@ def run_feature_extraction():
     )
     return feature_extraction_pipeline.run()
 
-def run_experiment():
+def run_experiment(artifacts_dir: Path):
     experiment_pipeline = HintExperiment(
         target_set="any",
         include_elapsed_seconds=True,
-        quick=True,
+        quick=False,
         load_artifacts=False,
         test_size=TEST_SIZE,
-        artifacts_dir=Path("data/experiments", datetime.now().strftime("%Y-%m-%d_%H-%M-%S")),
+        artifacts_dir=artifacts_dir,
     )
     return experiment_pipeline.run()
+
+def _generate_compact_summary(summary_dir: Path, experiment_results):
+    compact_summary = experiment_results.reset_index()
+    metric_labels = {
+        "accuracy": "Średnie accuracy",
+        "precision": "Średnie precision",
+        "recall": "Średnie recall",
+        "f1": "Średnie F1",
+    }
+    for metric, label in metric_labels.items():
+        compact_summary[label] = compact_summary.apply(
+            lambda row: (
+                f"{row[f'cv_{metric}']:.3f}".replace(".", ",")
+                + " ±"
+                + f"{row[f'cv_{metric}_std']:.3f}".replace(".", ",")
+            ),
+            axis=1,
+        )
+
+    compact_summary = compact_summary.rename(
+        columns={"model": "Model", "representation": "Reprezentacja"}
+    )[["Model", "Reprezentacja", *metric_labels.values()]]
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = summary_dir / "compact_summary.csv"
+    compact_summary.to_csv(
+        summary_path,
+        index=False,
+        encoding="utf-8",
+        sep=";",
+        decimal=",",
+    )
+    return summary_path
 
 def _generate_confusion_matrixes(charts_dir: Path, experiment_results):
     confusion_matrix_dir = charts_dir / "confusion_matrix"
@@ -152,63 +184,81 @@ def _generate_metric_charts(charts_dir: Path, experiment_results):
         "decision_tree": "Tuned Decision Tree",
     }
     representation_order = ["flat", "xsml"]
-    representation_colors = {"flat": "#4C78A8", "xsml": "#F58518"}
     metric_labels = {
         "accuracy": "Accuracy",
         "precision": "Precision",
         "recall": "Recall",
         "f1": "F1",
     }
+    metric_colors = {
+        "accuracy": "#4C78A8",
+        "precision": "#F58518",
+        "recall": "#54A24B",
+        "f1": "#E45756",
+    }
 
     results = experiment_results.reset_index()
-    x_positions = np.arange(len(model_order))
-    bar_width = 0.36
+    available_models = [
+        model for model in model_order if model in results["model"].unique()
+    ]
+    if not available_models:
+        return
 
-    for metric_name, metric_label in metric_labels.items():
-        metric_column = f"test_{metric_name}"
-        figure, axis = plt.subplots(figsize=(10, 6))
+    figure, axes = plt.subplots(1, 2, figsize=(17, 7), sharey=True, squeeze=False)
+    bar_width = 0.18
+    x_positions = np.arange(len(available_models))
 
-        for representation_index, representation in enumerate(representation_order):
-            representation_results = results[
-                results["representation"] == representation
-            ].set_index("model")
+    for axis, representation in zip(axes[0], representation_order):
+        representation_results = results[
+            results["representation"] == representation
+        ].set_index("model")
+        for metric_index, (metric_name, metric_label) in enumerate(metric_labels.items()):
+            metric_column = f"test_{metric_name}"
             values = [
                 representation_results.at[model, metric_column]
                 if model in representation_results.index
                 else np.nan
-                for model in model_order
+                for model in available_models
             ]
-            offsets = (
-                representation_index - (len(representation_order) - 1) / 2
-            ) * bar_width
+            offsets = (metric_index - (len(metric_labels) - 1) / 2) * bar_width
             bars = axis.bar(
                 x_positions + offsets,
                 values,
                 width=bar_width,
-                label=representation,
-                color=representation_colors[representation],
+                label=metric_label,
+                color=metric_colors[metric_name],
             )
             axis.bar_label(
                 bars,
                 labels=[f"{value:.4f}" if np.isfinite(value) else "" for value in values],
                 padding=3,
-                fontsize=8,
+                fontsize=7,
+                rotation=90,
             )
 
-        axis.set_title(f"{metric_label} by training method and representation")
-        axis.set_ylabel(metric_label)
+        axis.set_title(f"Knowledge representation: {representation}")
         axis.set_xticks(x_positions)
-        axis.set_xticklabels([model_labels[model] for model in model_order], rotation=15, ha="right")
-        axis.set_ylim(0, 1.12)
-        axis.legend(
-            title="Knowledge representation",
-            loc="center left",
-            bbox_to_anchor=(1.02, 0.5),
+        axis.set_xticklabels(
+            [model_labels[model] for model in available_models],
+            rotation=20,
+            ha="right",
         )
+        axis.set_ylim(0, 1.15)
         axis.grid(axis="y", linestyle="--", alpha=0.35)
-        figure.tight_layout(rect=(0, 0, 0.82, 1))
-        figure.savefig(metrics_dir / f"{metric_name}.png", dpi=160, bbox_inches="tight")
-        plt.close(figure)
+
+    axes[0, 0].set_ylabel("Holdout score")
+    handles, labels = axes[0, 0].get_legend_handles_labels()
+    figure.legend(
+        handles,
+        labels,
+        title="Metric",
+        loc="center left",
+        bbox_to_anchor=(0.88, 0.5),
+    )
+    figure.suptitle("Holdout metrics by model and knowledge representation")
+    figure.tight_layout(rect=(0, 0, 0.86, 0.95))
+    figure.savefig(metrics_dir / "all_metrics.png", dpi=160, bbox_inches="tight")
+    plt.close(figure)
 
 def generate_charts(charts_dir: Path, experiment_results):
     _generate_confusion_matrixes(
@@ -221,12 +271,19 @@ def generate_charts(charts_dir: Path, experiment_results):
     )
 
 def main():
+    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
     run_feature_extraction()
-    experiment_results = run_experiment()
-    generate_charts(
-        charts_dir=Path("data/charts", datetime.now().strftime("%Y-%m-%d_%H-%M-%S")),
+    experiment_dir = Path("data/experiments", run_id)
+    experiment_results = run_experiment(artifacts_dir=experiment_dir)
+    compact_summary_path = _generate_compact_summary(
+        summary_dir=experiment_dir / "compact_summary",
         experiment_results=experiment_results,
     )
+    generate_charts(
+        charts_dir=Path("data/charts", run_id),
+        experiment_results=experiment_results,
+    )
+    print(f"Compact summary saved to: {compact_summary_path}")
 
 if __name__ == "__main__":
     main()
