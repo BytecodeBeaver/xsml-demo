@@ -24,6 +24,7 @@ import argparse
 import json
 import os
 import re
+from typing import Literal
 import warnings
 
 import joblib
@@ -469,6 +470,136 @@ def _evaluate_model(
         "summary_path": summary_path,
         "confusion_matrix_plot": plot_path,
     }
+
+
+class HintExperiment:
+    """Przebieg eksperymentu klasyfikacji podpowiedzi; parametry odpowiadają opcjom CLI ``main``."""
+
+    def __init__(
+        self,
+        target_set: Literal["all", "hints", "any"] = "all",
+        include_elapsed_seconds: bool = False,
+        quick: bool = False,
+        load_artifacts: bool = False,
+        test_size: float = TEST_SIZE,
+        artifacts_dir: str | None = None,
+    ) -> None:
+        if target_set not in ("all", "hints", "any"):
+            raise ValueError("target_set must be 'all', 'hints' or 'any'")
+        if not 0 < test_size < 1:
+            raise ValueError("test_size must be between 0 and 1")
+        self.target_set: str = target_set
+        self.include_elapsed_seconds: bool = include_elapsed_seconds
+        self.quick: bool = quick
+        self.load_artifacts: bool = load_artifacts
+        self.test_size: float = test_size
+        self.output_suffix: str = "_with_elapsed_seconds" if include_elapsed_seconds else ""
+        self.artifacts_dir: str = artifacts_dir or os.path.join(
+            FEATURES_DIR,
+            "experiment_artifacts",
+            f"{MISSION}{self.output_suffix}_test{test_size:g}",
+        )
+
+    def _models(self) -> list[tuple[str, object, dict]]:
+        models = [
+            ("baseline_xgb", XGBClassifier(
+                objective="binary:logistic", eval_metric="logloss", random_state=RANDOM_STATE
+            ), {}),
+            ("baseline_decision_tree", DecisionTreeClassifier(random_state=RANDOM_STATE), {}),
+            (
+                "xgboost",
+                XGBClassifier(
+                    objective="binary:logistic", eval_metric="logloss", random_state=RANDOM_STATE
+                ),
+                XGBOOST_PARAM_GRID,
+            ),
+            (
+                "decision_tree",
+                DecisionTreeClassifier(random_state=RANDOM_STATE),
+                DECISION_TREE_PARAM_GRID,
+            ),
+        ]
+        return models[:2] if self.quick else models
+
+    def run(self) -> pd.DataFrame:
+        """Trenuje lub wczytuje modele, zapisuje metryki i ważność cech, zwraca tabelę metryk."""
+        xsml_features, xsml_targets = _load_mission(
+            _load_xsml_features, MISSION, include_elapsed_seconds=self.include_elapsed_seconds
+        )
+        flat_features, _ = _load_mission(
+            _load_flat_features, MISSION, include_elapsed_seconds=self.include_elapsed_seconds
+        )
+        representations = {"xsml": xsml_features, "flat": flat_features}
+        target_names = list(xsml_targets.columns)
+        if self.target_set == "hints":
+            target_names.remove("any_hint")
+        elif self.target_set == "any":
+            target_names = ["any_hint"]
+
+        results = []
+        for target_name in target_names:
+            target = xsml_targets[target_name]
+            for representation, features in representations.items():
+                _, split_dir = _artifact_paths(self.artifacts_dir, target_name, "", representation)
+                if self.load_artifacts:
+                    train_features, test_features, train_targets, test_targets = (
+                        _load_saved_holdout(split_dir)
+                    )
+                    folds = []
+                else:
+                    train_features, test_features, train_targets, test_targets, folds = (
+                        _make_splits(features, target, self.test_size)
+                    )
+                    _save_split(split_dir, train_features, train_targets, "holdout_train.csv")
+                    _save_split(split_dir, test_features, test_targets, "holdout_test.csv")
+                    for number, (train_idx, validation_idx) in enumerate(folds, 1):
+                        _save_split(
+                            split_dir,
+                            train_features.iloc[train_idx],
+                            train_targets.iloc[train_idx],
+                            f"fold_{number:02d}_train.csv",
+                        )
+                        _save_split(
+                            split_dir,
+                            train_features.iloc[validation_idx],
+                            train_targets.iloc[validation_idx],
+                            f"fold_{number:02d}_test.csv",
+                        )
+
+                for model_name, estimator, param_grid in self._models():
+                    results.append(
+                        _evaluate_model(
+                            model_name,
+                            representation,
+                            train_features,
+                            test_features,
+                            train_targets,
+                            test_targets,
+                            folds,
+                            estimator,
+                            param_grid,
+                            target_name,
+                            self.artifacts_dir,
+                            load_artifacts=self.load_artifacts,
+                        )
+                    )
+
+        importance_matrix = pd.concat(
+            {
+                f"{result['target']}|{result['model']}|{result['representation']}": result.pop("feature_importance")
+                for result in results
+            },
+            axis=1,
+        ).fillna(0.0)
+        importance_matrix.index.name = "feature"
+        importance_matrix.to_csv(
+            os.path.join(FEATURES_DIR, f"{MISSION}{self.output_suffix}_feature_importance.csv")
+        )
+        summary = pd.DataFrame(results).set_index(["target", "model", "representation"])
+        summary.to_csv(
+            os.path.join(FEATURES_DIR, f"{MISSION}{self.output_suffix}_classification_metrics.csv")
+        )
+        return summary
 
 
 def main() -> None:

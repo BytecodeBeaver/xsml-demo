@@ -495,6 +495,91 @@ class FlatSnapshotFeatureExtractor:
         return features
 
 
+class FeatureExtractionPipeline:
+    """Wczytuje misję XSML, buduje macierze cech i zapisuje je do plików CSV.
+
+    Parametry konstruktora odpowiadają argumentom wiersza poleceń ``main``.
+    """
+
+    def __init__(
+        self,
+        mission: Path = Path("data/missions/hardening_linux.yaml"),
+        output_dir: Path = Path("data/features"),
+        prefix: str | None = None,
+        random_seed: int | None = 42,
+        inventory_noise_variants: int = 2,
+        max_states: int = 10_000,
+    ) -> None:
+        self.mission: Path = Path(mission)
+        self.output_dir: Path = Path(output_dir)
+        self.prefix: str | None = prefix
+        self.random_seed: int | None = random_seed
+        self.inventory_noise_variants: int = inventory_noise_variants
+        self.max_states: int = max_states
+
+    def load_mission_document(self) -> dict:
+        """Wczytuje dokument YAML misji z dysku."""
+        with self.mission.open(encoding="utf-8") as mission_file:
+            document = yaml.safe_load(mission_file)
+        if not isinstance(document, dict):
+            raise ValueError("Dokument misji musi zawierać obiekt YAML na najwyższym poziomie.")
+        return document
+
+    def build_matrices(self, xsml_document: dict) -> FeatureMatrices:
+        """Buduje powiązane cechy z szumem ekwipunku i konfigurowalnym ziarnem generatora."""
+        mission = XSMLParser.parse(copy.deepcopy(xsml_document))
+        return XSMLFeatureExtractor(
+            mission,
+            max_states=self.max_states,
+            inventory_noise_variants=self.inventory_noise_variants,
+            random_seed=self.random_seed,
+        ).extract_training_data()
+
+    def export(self, matrices: FeatureMatrices, prefix: str | None = None) -> dict[str, Path]:
+        """Zapisuje obie macierze cech i etykiety w formacie CSV."""
+        file_prefix = prefix or self.prefix or str(matrices.flat_records["mission_id"].iloc[0])
+        directory = self.output_dir
+        directory.mkdir(parents=True, exist_ok=True)
+
+        mission_ids = matrices.flat_records["mission_id"].tolist()
+        xsml = matrices.xsml.reset_index()
+        flat = matrices.flat.reset_index()
+        targets = matrices.targets.reset_index()
+        for frame in (xsml, flat, targets):
+            frame.insert(1, "mission_id", mission_ids)
+
+        paths = {
+            "xsml_features": directory / f"{file_prefix}_xsml_features.csv",
+            "flat_features": directory / f"{file_prefix}_flat_features.csv",
+            "targets": directory / f"{file_prefix}_targets.csv",
+        }
+        self.write_csv(xsml, paths["xsml_features"])
+        self.write_csv(flat, paths["flat_features"])
+        self.write_csv(targets, paths["targets"])
+        return paths
+
+    def run(self) -> tuple[FeatureMatrices, dict[str, Path]]:
+        """Wykonuje pełny przebieg: wczytanie misji, ekstrakcję cech i zapis plików."""
+        document = self.load_mission_document()
+        mission_id = document.get("mission", {}).get("id", self.mission.stem)
+        matrices = self.build_matrices(document)
+        return matrices, self.export(matrices, self.prefix or mission_id)
+
+    @staticmethod
+    def export_training_csv(matrices: FeatureMatrices, path: str) -> None:
+        """Zapisuje płaskie rekordy migawek i zmienne docelowe w osobnych plikach CSV."""
+        FeatureExtractionPipeline.write_csv(matrices.flat_records, Path(path))
+        FeatureExtractionPipeline.write_csv(matrices.targets, Path(f"{path}.targets.csv"))
+
+    @staticmethod
+    def write_csv(frame: pd.DataFrame, path: Path) -> None:
+        """Zapisuje plik CSV z cechami boolowskimi."""
+        output = frame.copy()
+        for column in output.select_dtypes(include="bool").columns:
+            output[column] = output[column].map({True: "true", False: "false"})
+        output.to_csv(path, index=False)
+
+
 def build_paired_feature_matrices(
     xsml_document: dict,
     *,
@@ -503,52 +588,28 @@ def build_paired_feature_matrices(
     random_seed: int | None = 42,
 ) -> FeatureMatrices:
     """Buduje powiązane cechy z szumem ekwipunku i konfigurowalnym ziarnem generatora."""
-    mission = XSMLParser.parse(copy.deepcopy(xsml_document))
-    return XSMLFeatureExtractor(
-        mission,
+    return FeatureExtractionPipeline(
         max_states=max_states,
         inventory_noise_variants=inventory_noise_variants,
         random_seed=random_seed,
-    ).extract_training_data()
+    ).build_matrices(xsml_document)
 
 
 def export_training_csv(matrices: FeatureMatrices, path: str) -> None:
     """Zapisuje płaskie rekordy migawek i zmienne docelowe w osobnych plikach CSV."""
-    _write_csv(matrices.flat_records, Path(path))
-    _write_csv(matrices.targets, Path(f"{path}.targets.csv"))
+    FeatureExtractionPipeline.export_training_csv(matrices, path)
 
 
 def _write_csv(frame: pd.DataFrame, path: Path) -> None:
     """Zapisuje plik CSV z cechami boolowskimi."""
-    output = frame.copy()
-    for column in output.select_dtypes(include="bool").columns:
-        output[column] = output[column].map({True: "true", False: "false"})
-    output.to_csv(path, index=False)
+    FeatureExtractionPipeline.write_csv(frame, path)
 
 
 def export_paired_datasets(
     matrices: FeatureMatrices, output_dir: str | Path, prefix: str
 ) -> dict[str, Path]:
     """Zapisuje obie macierze cech i etykiety w formacie CSV."""
-    directory = Path(output_dir)
-    directory.mkdir(parents=True, exist_ok=True)
-
-    mission_ids = matrices.flat_records["mission_id"].tolist()
-    xsml = matrices.xsml.reset_index()
-    flat = matrices.flat.reset_index()
-    targets = matrices.targets.reset_index()
-    for frame in (xsml, flat, targets):
-        frame.insert(1, "mission_id", mission_ids)
-
-    paths = {
-        "xsml_features": directory / f"{prefix}_xsml_features.csv",
-        "flat_features": directory / f"{prefix}_flat_features.csv",
-        "targets": directory / f"{prefix}_targets.csv",
-    }
-    _write_csv(xsml, paths["xsml_features"])
-    _write_csv(flat, paths["flat_features"])
-    _write_csv(targets, paths["targets"])
-    return paths
+    return FeatureExtractionPipeline(output_dir=Path(output_dir)).export(matrices, prefix)
 
 
 def main(argv: list[str] | None = None) -> int:
