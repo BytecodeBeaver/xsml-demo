@@ -14,6 +14,7 @@ import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 from sklearn.metrics import ConfusionMatrixDisplay
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -69,7 +70,7 @@ def _generate_compact_summary(summary_dir: Path, experiment_results):
         columns={"model": "Model", "representation": "Reprezentacja"}
     )[["Model", "Reprezentacja", *metric_labels.values()]]
     summary_dir.mkdir(parents=True, exist_ok=True)
-    summary_path = summary_dir / "compact_summary.csv"
+    summary_path = summary_dir / "models_means_std.csv"
     compact_summary.to_csv(
         summary_path,
         index=False,
@@ -78,6 +79,117 @@ def _generate_compact_summary(summary_dir: Path, experiment_results):
         decimal=",",
     )
     return summary_path
+
+def _generate_validation_summary(summary_dir: Path, experiment_results):
+    validation_summary = experiment_results.reset_index()
+    metric_labels = {
+        "accuracy": "Accuracy",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1",
+    }
+    for metric, label in metric_labels.items():
+        validation_summary[label] = validation_summary[f"test_{metric}"].map(
+            lambda value: f"{value:.3f}".replace(".", ",")
+        )
+
+    validation_summary = validation_summary.rename(
+        columns={"model": "Model", "representation": "Reprezentacja"}
+    )[["Model", "Reprezentacja", *metric_labels.values()]]
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    summary_path = summary_dir / "models_validation.csv"
+    validation_summary.to_csv(
+        summary_path,
+        index=False,
+        encoding="utf-8",
+        sep=";",
+    )
+    return summary_path
+
+def _generate_fold_summaries(summary_dir: Path, experiment_results):
+    fold_rows = []
+    for _, result in experiment_results.iterrows():
+        summary_path = Path(result["summary_path"])
+        if not summary_path.is_absolute():
+            summary_path = PROJECT_ROOT / summary_path
+        with summary_path.open(encoding="utf-8") as summary_file:
+            model_summary = json.load(summary_file)
+
+        for fold in model_summary["cv_fold_results"]:
+            fold_rows.append(
+                {
+                    "Model": model_summary["model"],
+                    "Reprezentacja": model_summary["representation"],
+                    "Fold": fold["fold"],
+                    **fold["metrics"],
+                }
+            )
+
+    fold_summary = pd.DataFrame(fold_rows)
+    metric_labels = {
+        "accuracy": "Accuracy",
+        "precision": "Precision",
+        "recall": "Recall",
+        "f1": "F1",
+    }
+    for metric, label in metric_labels.items():
+        fold_summary[label] = fold_summary[metric].map(
+            lambda value: f"{value:.3f}".replace(".", ",")
+        )
+
+    summary_dir.mkdir(parents=True, exist_ok=True)
+    output_paths = []
+    for (model_name, representation), model_rows in fold_summary.groupby(
+        ["Model", "Reprezentacja"], sort=False
+    ):
+        model_rows = model_rows.sort_values(["Reprezentacja", "Fold"])
+        model_rows = model_rows[
+            ["Model", "Reprezentacja", "Fold", *metric_labels.values()]
+        ]
+        summary_path = summary_dir / f"{model_name}_{representation}_folds.csv"
+        model_rows.to_csv(
+            summary_path,
+            index=False,
+            encoding="utf-8",
+            sep=";",
+        )
+        output_paths.append(summary_path)
+    return output_paths
+
+def _generate_validation_confusion_matrices(summary_dir: Path, experiment_results):
+    matrix_dir = summary_dir.parent / "confusion_matrices"
+    matrix_dir.mkdir(parents=True, exist_ok=True)
+    output_paths = []
+
+    for _, result in experiment_results.iterrows():
+        summary_path = Path(result["summary_path"])
+        if not summary_path.is_absolute():
+            summary_path = PROJECT_ROOT / summary_path
+        with summary_path.open(encoding="utf-8") as summary_file:
+            model_summary = json.load(summary_file)
+
+        confusion = np.asarray(
+            model_summary["holdout_confusion_matrix"]["values"]
+        )
+        display = ConfusionMatrixDisplay(
+            confusion_matrix=confusion,
+            display_labels=["No hint (0)", "Hint (1)"],
+        )
+        display.plot(cmap="Blues", values_format="d", colorbar=False)
+        display.ax_.set_title(
+            f"Validation set — {model_summary['model']} / "
+            f"{model_summary['representation']}"
+        )
+        display.figure_.tight_layout()
+
+        image_path = matrix_dir / (
+            f"{model_summary['model']}_{model_summary['representation']}.png"
+        )
+        display.figure_.savefig(image_path, dpi=160, bbox_inches="tight")
+        plt.close(display.figure_)
+        output_paths.append(image_path)
+
+    return output_paths
 
 def _generate_confusion_matrixes(charts_dir: Path, experiment_results):
     confusion_matrix_dir = charts_dir / "confusion_matrix"
@@ -279,11 +391,29 @@ def main():
         summary_dir=experiment_dir / "compact_summary",
         experiment_results=experiment_results,
     )
+    validation_summary_path = _generate_validation_summary(
+        summary_dir=experiment_dir / "compact_summary",
+        experiment_results=experiment_results,
+    )
+    fold_summary_paths = _generate_fold_summaries(
+        summary_dir=experiment_dir / "compact_summary",
+        experiment_results=experiment_results,
+    )
+    _generate_validation_confusion_matrices(
+        summary_dir=experiment_dir / "compact_summary",
+        experiment_results=experiment_results,
+    )
     generate_charts(
         charts_dir=Path("data/charts", run_id),
         experiment_results=experiment_results,
     )
     print(f"Compact summary saved to: {compact_summary_path}")
+    print(f"Validation metrics saved to: {validation_summary_path}")
+    print(f"Fold metrics saved to: {', '.join(map(str, fold_summary_paths))}")
+    print(
+        "Validation confusion matrices saved to: "
+        f"{experiment_dir / 'confusion_matrices'}"
+    )
 
 if __name__ == "__main__":
     main()
