@@ -157,7 +157,7 @@ def _generate_fold_summaries(summary_dir: Path, experiment_results):
     return output_paths
 
 def _generate_validation_confusion_matrices(summary_dir: Path, experiment_results):
-    matrix_dir = summary_dir.parent / "confusion_matrices"
+    matrix_dir = summary_dir / "validation_confusion_matrices"
     matrix_dir.mkdir(parents=True, exist_ok=True)
     output_paths = []
 
@@ -399,7 +399,7 @@ def main():
         summary_dir=experiment_dir / "compact_summary",
         experiment_results=experiment_results,
     )
-    _generate_validation_confusion_matrices(
+    validation_confusion_matrix_paths = _generate_validation_confusion_matrices(
         summary_dir=experiment_dir / "compact_summary",
         experiment_results=experiment_results,
     )
@@ -412,7 +412,7 @@ def main():
     print(f"Fold metrics saved to: {', '.join(map(str, fold_summary_paths))}")
     print(
         "Validation confusion matrices saved to: "
-        f"{experiment_dir / 'confusion_matrices'}"
+        f"{experiment_dir / 'compact_summary' / 'validation_confusion_matrices'}"
     )
 
 if __name__ == "__main__":
