@@ -436,6 +436,10 @@ def _evaluate_model(
             metric: float(np.mean([score[metric] for score in fold_scores]))
             for metric in SCORERS
         },
+        "cv_metrics_std": {
+            metric: float(np.std([score[metric] for score in fold_scores]))
+            for metric in SCORERS
+        },
         "holdout_metrics": holdout_scores,
         "holdout_confusion_matrix": {
             "labels": [0, 1],
@@ -465,6 +469,10 @@ def _evaluate_model(
         "feature_importance": importance,
         "best_params_per_fold": best_params,
         **{f"cv_{metric}": np.mean([score[metric] for score in fold_scores]) for metric in SCORERS},
+        **{
+            f"cv_{metric}_std": np.std([score[metric] for score in fold_scores])
+            for metric in SCORERS
+        },
         **{f"test_{metric}": value for metric, value in holdout_scores.items()},
         "model_path": model_path,
         "summary_path": summary_path,
