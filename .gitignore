@@ -43,3 +43,7 @@ htmlcov/
 .DS_Store
 Thumbs.db
 
+data/charts/
+data/features/
+data/experiments/
+
