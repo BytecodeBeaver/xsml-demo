@@ -22,7 +22,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from paper.training.experiment import HintExperiment
-from parser.feature_extractor import FeatureExtractionPipeline
+from parser.feature_extractor import FeatureExtractionPipeline, FeatureMatrices
 
 TEST_SIZE = 0.2
 
@@ -35,7 +35,45 @@ def run_feature_extraction():
         inventory_noise_variants=2,
         max_states=10_000,
     )
-    return feature_extraction_pipeline.run()
+    result = feature_extraction_pipeline.run()
+    matrices, _ = result
+    _report_duplicate_samples(matrices)
+    return result
+
+
+def _report_duplicate_samples(matrices: FeatureMatrices) -> None:
+    """Raportuje rekordy z identycznymi cechami i zmiennymi docelowymi."""
+    sample_ids = matrices.flat_records["sample_id"].reset_index(drop=True)
+
+    for representation, features in (
+        ("XSML", matrices.xsml),
+        ("flat", matrices.flat),
+    ):
+        records = pd.concat(
+            [features.reset_index(drop=True), matrices.targets.reset_index(drop=True)],
+            axis=1,
+        )
+        duplicate_mask = records.duplicated(keep=False)
+        duplicate_rows = int(records.duplicated().sum())
+        duplicate_groups = int(
+            records.loc[duplicate_mask].drop_duplicates().shape[0]
+        )
+
+        if duplicate_rows == 0:
+            print(f"Duplikaty ({representation}): nie znaleziono.")
+            continue
+
+        duplicate_sample_ids = sample_ids.loc[duplicate_mask.to_numpy()].tolist()
+        shown_ids = ", ".join(duplicate_sample_ids[:10])
+        remaining_count = len(duplicate_sample_ids) - 10
+        if remaining_count > 0:
+            shown_ids += f" oraz {remaining_count} kolejnych"
+
+        print(
+            f"Duplikaty ({representation}): {duplicate_rows} powtórzonych próbek "
+            f"w {duplicate_groups} grupach."
+        )
+        print(f"  sample_id: {shown_ids}")
 
 def run_experiment(artifacts_dir: Path):
     experiment_pipeline = HintExperiment(
@@ -173,7 +211,7 @@ def _generate_validation_confusion_matrices(summary_dir: Path, experiment_result
         )
         display = ConfusionMatrixDisplay(
             confusion_matrix=confusion,
-            display_labels=["No hint (0)", "Hint (1)"],
+            display_labels=["Brak wsparcia (0)", "Udzielenie wsparcia (1)"],
         )
         display.plot(cmap="Blues", values_format="d", colorbar=False)
         display.ax_.set_title(
@@ -218,10 +256,12 @@ def _generate_confusion_matrixes(charts_dir: Path, experiment_results):
 
         display = ConfusionMatrixDisplay(
             confusion_matrix=matrix,
-            display_labels=["No hint (0)", "Hint (1)"],
+            display_labels=["Brak wsparcia (0)", "Udzielenie wsparcia (1)"],
         )
         display.plot(cmap="Blues", values_format="d", colorbar=False)
-        display.ax_.set_title(f"{model_name} — {representation}")
+        display.ax_.set_title(f"Macierz pomyłek na zbiorze holdout: {model_name} — {representation}")
+        display.ax_.set_xlabel("Przewidywana etykieta")
+        display.ax_.set_ylabel("Prawdziwa etykieta")
         display.figure_.tight_layout()
 
         representation_dir = confusion_matrix_dir / representation
@@ -260,7 +300,7 @@ def _generate_confusion_matrixes(charts_dir: Path, experiment_results):
                     continue
                 display = ConfusionMatrixDisplay(
                     confusion_matrix=matrix,
-                    display_labels=["No hint (0)", "Hint (1)"],
+                    display_labels=["Brak wsparcia (0)", "Udzielenie wsparcia (1)"],
                 )
                 display.plot(
                     ax=axis,
@@ -268,7 +308,9 @@ def _generate_confusion_matrixes(charts_dir: Path, experiment_results):
                     values_format="d",
                     colorbar=False,
                 )
-                axis.set_title(f"{model_name} — {representation}")
+                axis.set_title(f"Macierz pomyłek na zbiorze holdout: {model_name} — {representation}")
+                axis.set_xlabel("Przewidywana etykieta")
+                axis.set_ylabel("Prawdziwa etykieta")
 
         figure.suptitle(f"Holdout confusion matrices — {group_name} models")
         figure.tight_layout(rect=(0, 0, 1, 0.98))

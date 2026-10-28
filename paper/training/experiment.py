@@ -410,6 +410,14 @@ def _evaluate_model(
         "model_class": type(final_estimator).__name__,
         "model_path": model_path,
         "split_directory": split_dir,
+        "total_samples": len(train_targets) + len(test_targets),
+        "total_class_counts": {
+            str(label): int(count)
+            for label, count in pd.concat([train_targets, test_targets])
+            .value_counts()
+            .sort_index()
+            .items()
+        },
         "training_samples": len(train_targets),
         "holdout_samples": len(test_targets),
         "training_class_counts": {
