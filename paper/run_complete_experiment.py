@@ -5,6 +5,7 @@ Uruchamia zarówno ekstraktor cech w oparciu o obecną wersję pliku XSML z misj
 oraz eksperyment, który odpowiednio dzieli zbiór i trenuje model ML na tych danych.
 """
 
+import argparse
 from pathlib import Path
 from datetime import datetime
 import json
@@ -75,12 +76,12 @@ def _report_duplicate_samples(matrices: FeatureMatrices) -> None:
         )
         print(f"  sample_id: {shown_ids}")
 
-def run_experiment(artifacts_dir: Path):
+def run_experiment(artifacts_dir: Path, load_artifacts: bool = False):
     experiment_pipeline = HintExperiment(
         target_set="any",
         include_elapsed_seconds=True,
         quick=False,
-        load_artifacts=False,
+        load_artifacts=load_artifacts,
         test_size=TEST_SIZE,
         artifacts_dir=artifacts_dir,
     )
@@ -424,11 +425,17 @@ def generate_charts(charts_dir: Path, experiment_results):
         experiment_results=experiment_results,
     )
 
-def main():
-    run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    run_feature_extraction()
+def main(load_latest: bool = False):
+    if load_latest:
+        experiments_root = Path("data/experiments")
+        run_id = max(path.name for path in experiments_root.iterdir() if path.is_dir())
+    else:
+        run_id = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        run_feature_extraction()
     experiment_dir = Path("data/experiments", run_id)
-    experiment_results = run_experiment(artifacts_dir=experiment_dir)
+    experiment_results = run_experiment(
+        artifacts_dir=experiment_dir, load_artifacts=load_latest
+    )
     compact_summary_path = _generate_compact_summary(
         summary_dir=experiment_dir / "compact_summary",
         experiment_results=experiment_results,
@@ -458,4 +465,10 @@ def main():
     )
 
 if __name__ == "__main__":
-    main()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--load-latest",
+        action="store_true",
+        help="Wczytaj modele i zbiory z najnowszego katalogu w data/experiments.",
+    )
+    main(load_latest=parser.parse_args().load_latest)
